@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seseedy Chatbot</title>
+    <style>
+        /* --- LAYOUT STYLES --- */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            /* Transparent background so it blends with Streamlit */
+            background-color: transparent;
+            display: flex;
+            justify-content: center; /* Center horizontally */
+        }
+
+        #chat-widget-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        #chat-window {
+            /* Fixed width for a "smaller" look */
+            width: 100%;
+            max-width: 700px; /* Limits width so it doesn't stretch too wide */
+            height: 100%;
+            
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            
+            /* Visual tweaks */
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        #chat-header {
+            background: #2d2d2d;
+            color: #00ff9d;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        #chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .bot { background: #333; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .user { background: #00ff9d; color: black; align-self: flex-end; border-bottom-right-radius: 2px; }
+
+        #chat-input-area {
+            padding: 15px;
+            background: #2d2d2d;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #333;
+        }
+
+        #user-input {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            outline: none;
+            font-size: 15px;
+        }
+
+        .btn-send {
+            background: #00ff9d;
+            border: none;
+            padding: 0 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 15px;
+            color: #1a1a1a;
+        }
+
+        .btn-send:hover { opacity: 0.9; }
+
+        .options-area {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .opt-btn {
+            background: transparent;
+            border: 1px solid #00ff9d;
+            color: #00ff9d;
+            padding: 8px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    </style>
+</head>
+<body>
+
+<div id="chat-widget-container">
+    <div id="chat-window">
+        <div id="chat-header">
+            <span>🤖 Seseedy AI Assistant</span>
+        </div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-area">
+            <input type="text" id="user-input" placeholder="Ask about seeds, planting, or equipment...">
+            <button class="btn-send" onclick="handleSend()">Send</button>
+        </div>
+    </div>
+</div>
+
+<script type="importmap">
+    { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
+</script>
+
+<script type="module">
+    import { GoogleGenerativeAI } from "@google/generative-ai";
+
+    // --- CONFIGURATION ---
+    // YOUR NEW KEY IS HERE:
+    const API_KEY = "AIzaSyA2Tx3yhU5tmRj2P09-PIa2XQfnCUQBRGI"; 
+    
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const websiteUrl = "https://fefish-shop.netlify.app/";
+
+    const chatMessages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+
+    // --- INITIAL GREETING ---
+    function init() {
+        addMessage("bot", "Hello! My name is Seseedy, welcome to Seseed. Please feel free to ask me any questions you have about the website or our seeds.<br><br>Selamat datang ke Seseed! Aku Seseedy. Sila tanya apa-apa sahaja soalan anda mempunyai tentang laman sesawang ini.");
+    }
+    
+    init();
+
+    async function handleSend() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        addMessage("user", text);
+        userInput.value = "";
+        
+        const loadingId = addMessage("bot", "Thinking...");
+
+        try {
+            const prompt = `You are Seseedy, an AI for the website: ${websiteUrl}. 
+            Answer the user's question using the information from this site. 
+            If you don't know, say you're not sure but be helpful. 
+            User Question: ${text}`;
+
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            
+            document.getElementById(loadingId).innerHTML = response.text();
+            askMoreHelp();
+        } catch (error) {
+            // --- REFINED ERROR HANDLING ---
+            console.error("Gemini Error:", error);
+            // This displays the EXACT error in the chat window so you know what is wrong
+            document.getElementById(loadingId).innerHTML = 
+                `⚠️ <b>Error:</b> ${error.message || "Unknown error"}. <br><br>Please check your internet connection or API Key quota.`;
+        }
+    }
+
+    function addMessage(sender, text) {
+        const id = "msg-" + Date.now();
+        const div = document.createElement('div');
+        div.className = `message ${sender}`;
+
+        div.id = id;
+        div.innerHTML = text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return id;
+    }
+
+    function askMoreHelp() {
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <p style="font-size:12px; margin: 10px 0 5px 0; color: #888;">Do you need any more help?</p>
+            <div class="options-area">
+                <button class="opt-btn" onclick="window.helpResponse(true)">Yes</button>
+                <button class="opt-btn" onclick="window.helpResponse(false)">No</button>
+            </div>
+        `;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    window.helpResponse = (wantsHelp) => {
+        if (wantsHelp) {
+            addMessage("bot", "How else can I help?");
+        } else {
+            addMessage("bot", "Bye! 👋"); 
+            document.getElementById('chat-input-area').style.display = 'none';
+        }
+    };
+
+    userInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleSend(); });
+</script>
+
+</body>
+</html>
