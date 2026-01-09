@@ -11,10 +11,10 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            /* Transparent background so it blends with Streamlit */
             background-color: transparent;
             display: flex;
-            justify-content: center; /* Center horizontally */
+            justify-content: center;
+            font-family: sans-serif;
         }
 
         #chat-widget-container {
@@ -25,16 +25,12 @@
         }
 
         #chat-window {
-            /* Fixed width for a "smaller" look */
             width: 100%;
-            max-width: 700px; /* Limits width so it doesn't stretch too wide */
+            max-width: 700px;
             height: 100%;
-            
             background: #1a1a1a;
             display: flex;
             flex-direction: column;
-            
-            /* Visual tweaks */
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             overflow: hidden;
@@ -69,10 +65,31 @@
             border-radius: 10px;
             font-size: 15px;
             line-height: 1.5;
+            word-wrap: break-word;
         }
 
-        .bot { background: #333; align-self: flex-start; border-bottom-left-radius: 2px; }
-        .user { background: #00ff9d; color: black; align-self: flex-end; border-bottom-right-radius: 2px; }
+        /* BOT MESSAGES = DARK GRAY */
+        .bot { 
+            background: #333; 
+            color: #e0e0e0;
+            align-self: flex-start; 
+            border-bottom-left-radius: 2px; 
+        }
+
+        /* USER MESSAGES = BRIGHT GREEN */
+        .user { 
+            background: #00ff9d; 
+            color: black; 
+            align-self: flex-end; 
+            border-bottom-right-radius: 2px; 
+            font-weight: 500;
+        }
+
+        /* ERROR MESSAGES (Inside Bot Bubble) */
+        .error-text {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
 
         #chat-input-area {
             padding: 15px;
@@ -102,9 +119,10 @@
             font-weight: bold;
             font-size: 15px;
             color: #1a1a1a;
+            transition: opacity 0.2s;
         }
 
-        .btn-send:hover { opacity: 0.9; }
+        .btn-send:hover { opacity: 0.8; }
 
         .options-area {
             display: flex;
@@ -122,12 +140,10 @@
             font-size: 13px;
         }
         
-        /* Scrollbar styling */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1a1a1a; }
         ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
-
     </style>
 </head>
 <body>
@@ -153,87 +169,128 @@
     import { GoogleGenerativeAI } from "@google/generative-ai";
 
     // --- CONFIGURATION ---
-    // YOUR NEW KEY IS HERE:
-    const API_KEY = "AIzaSyA2Tx3yhU5tmRj2P09-PIa2XQfnCUQBRGI"; 
+    // The Python script will replace this placeholder with the real key
+    const API_KEY = "API_KEY_PLACEHOLDER"; 
     
+    const websiteUrl = "https://farmersseedsproject.streamlit.app/";
+
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const websiteUrl = "https://fefish-shop.netlify.app/";
+    
+    // --- CHANGED MODEL TO 'gemini-pro' ---
+    // This is the most stable version and fixes the 404 error
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
 
     // --- INITIAL GREETING ---
     function init() {
-        addMessage("bot", "Hello! My name is Seseedy, welcome to Seseed. Please feel free to ask me any questions you have about the website or our seeds.<br><br>Selamat datang ke Seseed! Aku Seseedy. Sila tanya apa-apa sahaja soalan anda mempunyai tentang laman sesawang ini.");
+        addMessage("bot", "Hello! My name is Seseedy. I can help you navigate the website or choose the best seeds for your farm.<br><br>Selamat datang ke Seseed! Aku Seseedy. Sila tanya apa-apa sahaja.");
     }
     
     init();
 
+    // --- MAIN SEND FUNCTION ---
     async function handleSend() {
         const text = userInput.value.trim();
         if (!text) return;
 
+        // 1. Add User Message (Green Bubble)
         addMessage("user", text);
         userInput.value = "";
         
+        // 2. Add Temporary Bot Message (Gray Bubble)
         const loadingId = addMessage("bot", "Thinking...");
 
         try {
-            const prompt = `You are Seseedy, an AI for the website: ${websiteUrl}. 
-            Answer the user's question using the information from this site. 
-            If you don't know, say you're not sure but be helpful. 
+            const prompt = `You are Seseedy, an AI assistant for the website: ${websiteUrl}. 
+            
+            Website Structure:
+            1. Home Button: Main landing page.
+            2. Browse Seeds: Shows all products.
+            3. Categories (Left): Fruiting Veg, Fruit, Leafy Greens, Vegetable.
+            4. Cart: Top right corner.
+            5. Login/Register: Top right corner.
+
+            Your goal is to help farmers navigate this menu and find seeds.
+            Answer the user's question helpfully and briefly.
+            
             User Question: ${text}`;
 
             const result = await model.generateContent(prompt);
             const response = await result.response;
+            const responseText = response.text();
             
-            document.getElementById(loadingId).innerHTML = response.text();
+            // 3. Update the Gray Bubble with the Answer
+            const botBubble = document.getElementById(loadingId);
+            if(botBubble) {
+                botBubble.innerHTML = responseText;
+            }
+            
             askMoreHelp();
+
         } catch (error) {
-            // --- REFINED ERROR HANDLING ---
             console.error("Gemini Error:", error);
-            // This displays the EXACT error in the chat window so you know what is wrong
-            document.getElementById(loadingId).innerHTML = 
-                `⚠️ <b>Error:</b> ${error.message || "Unknown error"}. <br><br>Please check your internet connection or API Key quota.`;
+            
+            // 4. If Error, Update the Gray Bubble
+            const botBubble = document.getElementById(loadingId);
+            if(botBubble) {
+                // Friendly error message
+                let userMsg = "Sorry, I lost connection to the brain.";
+                if(error.message.includes("404")) userMsg = "Error: Model not found. I switched to 'gemini-pro', please refresh.";
+                if(error.message.includes("429")) userMsg = "Error: Too many requests. Please wait a moment.";
+                
+                botBubble.innerHTML = `<span class="error-text">⚠️ ${userMsg}</span><br><br><small>Tech details: ${error.message}</small>`;
+            }
         }
     }
 
+    // --- HELPER: ADD MESSAGE ---
     function addMessage(sender, text) {
-        const id = "msg-" + Date.now();
+        const id = "msg-" + Date.now() + Math.random();
         const div = document.createElement('div');
-        div.className = `message ${sender}`;
-
+        
+        div.className = `message ${sender}`; 
         div.id = id;
         div.innerHTML = text;
+        
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        return id;
+        return id; 
     }
 
     function askMoreHelp() {
         const div = document.createElement('div');
+        div.style.alignSelf = "flex-start";
+        div.style.marginLeft = "5px";
+        
         div.innerHTML = `
-            <p style="font-size:12px; margin: 10px 0 5px 0; color: #888;">Do you need any more help?</p>
             <div class="options-area">
-                <button class="opt-btn" onclick="window.helpResponse(true)">Yes</button>
-                <button class="opt-btn" onclick="window.helpResponse(false)">No</button>
+                <p style="font-size:12px; color: #888; margin: 5px 0;">Need more help?</p>
+                <div style="display:flex; gap:10px;">
+                    <button class="opt-btn" onclick="window.helpResponse(true)">Yes</button>
+                    <button class="opt-btn" onclick="window.helpResponse(false)">No</button>
+                </div>
             </div>
         `;
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // --- EXPOSE FUNCTIONS TO HTML ---
+    window.handleSend = handleSend;
+    
     window.helpResponse = (wantsHelp) => {
         if (wantsHelp) {
-            addMessage("bot", "How else can I help?");
+            addMessage("bot", "What else would you like to know?");
         } else {
-            addMessage("bot", "Bye! 👋"); 
-            document.getElementById('chat-input-area').style.display = 'none';
+            addMessage("bot", "Happy farming! 👋"); 
         }
     };
 
-    userInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleSend(); });
+    userInput.addEventListener("keypress", (e) => { 
+        if (e.key === "Enter") handleSend(); 
+    });
 </script>
 
 </body>

@@ -37,7 +37,12 @@ def farmer_dashboard(products):
         st.query_params.clear() 
         st.rerun()
 
-    chat_icon_b64 = get_base64_of_bin_file("Screenshot 2025-12-28 232049.png")
+    chat_icon_b64 = get_base64_of_bin_file("images/Screenshot 2025-12-28 232049.png") # Ensure path is correct
+    
+    # If image is missing, use a generic icon URL or skip
+    if not chat_icon_b64:
+        # Fallback to a simple text button if image fails, or just pass
+        pass 
     
     if chat_icon_b64:
         st.markdown(f"""
@@ -61,7 +66,7 @@ def farmer_dashboard(products):
             </style>
             
             <a href="?chat_trigger=true" target="_self" class="floating-chat-container">
-                <img src="{chat_icon_b64}" alt="Customer Service">
+                <img src="data:image/png;base64,{chat_icon_b64}" alt="Customer Service">
             </a>
         """, unsafe_allow_html=True)
 
@@ -69,9 +74,9 @@ def farmer_dashboard(products):
     # 2. STYLING & BACKGROUND
     # =========================================================
 
-    bg_encoded = get_base64_of_bin_file("background.png")
+    bg_encoded = get_base64_of_bin_file("background.png") # Ensure path is correct
     if bg_encoded:
-        bg_style = f'background-image: url("{bg_encoded}"); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;'
+        bg_style = f'background-image: url("data:image/png;base64,{bg_encoded}"); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;'
     else:
         bg_style = "background-image: none;"
 
@@ -140,31 +145,59 @@ def farmer_dashboard(products):
     """, unsafe_allow_html=True)
 
     # =========================================================
-    # 3. CHATBOT VIEW SWITCH
+    # 3. CHATBOT VIEW SWITCH (NATIVE STREAMLIT CHAT)
     # =========================================================
     
+    # Initialize Chat History if not present
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = [
+            {"role": "assistant", "content": "Hello! I am Seseedy. Ask me about seeds, planting guides, or how to use this website!"}
+        ]
+
+    # Check if chatbot should be shown
     if 'show_chatbot' not in st.session_state:
         st.session_state['show_chatbot'] = False
 
     if st.session_state['show_chatbot']:
         st.markdown("<br>", unsafe_allow_html=True)
         
-        if st.button("← Back to Dashboard"):
-            st.session_state['show_chatbot'] = False
-            st.rerun()
+        # Header with Back Button
+        c_back, c_title = st.columns([1, 5])
+        with c_back:
+            if st.button("← Back"):
+                st.session_state['show_chatbot'] = False
+                st.rerun()
+        with c_title:
+            st.title("🤖 Seseedy AI Assistant")
 
-        chatbot_file_path = "chatbot.html"
-        if os.path.exists(chatbot_file_path):
-            try:
-                with open(chatbot_file_path, "r", encoding="utf-8") as f:
-                    chatbot_code = f.read()
-                components.html(chatbot_code, height=700, scrolling=True)
-            except Exception as e:
-                st.error(f"Error loading chatbot: {e}")
-        else:
-            st.warning("⚠️ 'chatbot.html' file not found.")
+        st.markdown("---")
+
+        # 1. Display Chat History
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # 2. Chat Input & Response Logic
+        # This imports the 'ask_ai' function from your backend.py file
+        import backend
+
+        if prompt := st.chat_input("Ask about seeds, planting, or equipment..."):
+            # Show User Message
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            # Get AI Response
+            with st.chat_message("assistant"):
+                with st.spinner("Seseedy is thinking..."):
+                    # CALL THE PYTHON BACKEND DIRECTLY
+                    response = backend.ask_ai(prompt)
+                    st.markdown(response)
             
-        return 
+            # Save AI Message
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+        return # Stop execution so we don't show the dashboard underneath
 
     # =========================================================
     # 4. DASHBOARD LOGIC
