@@ -2,7 +2,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import altair as alt 
-import ai_logic 
+import ai_engine 
 import time
 
 # --- CUSTOM CSS ---

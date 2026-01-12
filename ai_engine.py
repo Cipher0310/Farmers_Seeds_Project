@@ -120,7 +120,7 @@ if __name__ == "__main__":
     
     # 1. Hot Season Test (Papaya in May)
     # Expect: "Hot Season Demand"
-    print(ai.predict_with_reasoning("Papaya Seeds", 5))
+    print(ai.predict_with_reasoning("Honeydew Seeds (Jade Dew)", 1))
 
     # 2. Holiday Test (Sweet Corn in December)
     # Expect: "School Holiday Surge" (possibly mixed with Monsoon Drop)
