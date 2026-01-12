@@ -2,8 +2,9 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import altair as alt 
-import ai_engine 
+from ai_engine import SeedAI  # <--- UPDATED IMPORT
 import time
+import calendar # <--- ADDED for month names
 
 # --- CUSTOM CSS ---
 def load_css():
@@ -147,6 +148,13 @@ def delete_product_from_db(product_name):
 def show_dashboard():
     load_css()
     
+    # --- INITIALIZE NEW AI ENGINE ---
+    try:
+        ai = SeedAI()
+    except Exception as e:
+        st.error(f"⚠️ AI Engine Error: {e}. Ensure 'train_ai.py' has been run.")
+        st.stop()
+
     try:
         farm_name, username, df_products, df_sales = get_data()
     except Exception as e:
@@ -168,7 +176,6 @@ def show_dashboard():
     c1, c2 = st.columns([8,1])
     c1.title(f"{farm_name} Dashboard")
     
-    # FIXED: "Back" button removed. Only "Log Out" remains.
     if c2.button("🚪 Log Out"):
         st.session_state['logged_in'] = False
         st.session_state['role'] = None
@@ -205,7 +212,7 @@ def show_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. AI FORECAST GRAPH
+    # 2. AI FORECAST GRAPH (UPDATED TO CONNECT TO AI_ENGINE.PY)
     st.markdown('<div class="ai-container">', unsafe_allow_html=True)
     st.markdown('<div class="ai-title">🧠 AI Demand Forecast (Next 12 Months)</div>', unsafe_allow_html=True)
     st.markdown('<div class="ai-desc">Visualizing future demand trends. Hover over the dots to see AI Reasoning.</div>', unsafe_allow_html=True)
@@ -216,19 +223,40 @@ def show_dashboard():
 
         product_row = df_products[df_products['name'] == selected_name].iloc[0]
         current_stock = product_row['stock']
-        days_to_grow = product_row['days_to_grow']
-        peak_month = product_row['peak_month']
+        
+        # --- NEW FORECAST LOGIC ---
+        forecast_data = []
+        for m in range(1, 13):
+            # Calls your new reasoning engine
+            prediction = ai.predict_with_reasoning(selected_name, m)
+            
+            # Map Month Number (1) -> Name (Jan)
+            month_name = calendar.month_abbr[m]
+            
+            forecast_data.append({
+                "Month": month_name,
+                "Predicted Demand": prediction['Predicted_Sales'],
+                "AI Reasoning": prediction['Reasoning']
+            })
 
-        forecast_df = ai_engine.get_yearly_predictions(selected_name, days_to_grow, peak_month)
+        forecast_df = pd.DataFrame(forecast_data)
 
         if not forecast_df.empty:
+            # Sort order for the chart (Jan -> Dec)
+            month_order = list(calendar.month_abbr[1:])
+            
             base = alt.Chart(forecast_df).encode(
-                x=alt.X('Month', sort=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], title="Month"),
+                x=alt.X('Month', sort=month_order, title="Month"),
                 y=alt.Y('Predicted Demand', title="Predicted Units Sold")
             )
             line = base.mark_line(color='#3A5A40', strokeWidth=4)
-            points = base.mark_circle(size=120, color='#3A5A40').encode(tooltip=['Month', 'Predicted Demand', 'AI Reasoning'])
+            points = base.mark_circle(size=120, color='#3A5A40').encode(
+                tooltip=['Month', 'Predicted Demand', 'AI Reasoning']
+            )
+            
+            # Stock Line
             stock_line = alt.Chart(pd.DataFrame({'y': [current_stock]})).mark_rule(color='#D62828', strokeDash=[5,5]).encode(y='y')
+            
             final_chart = (line + points + stock_line).properties(height=400).interactive()
             st.altair_chart(final_chart, use_container_width=True)
             
