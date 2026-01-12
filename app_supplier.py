@@ -219,7 +219,7 @@ def show_dashboard():
         days_to_grow = product_row['days_to_grow']
         peak_month = product_row['peak_month']
 
-        forecast_df = ai_logic.get_yearly_predictions(selected_name, days_to_grow, peak_month)
+        forecast_df = ai_engine.get_yearly_predictions(selected_name, days_to_grow, peak_month)
 
         if not forecast_df.empty:
             base = alt.Chart(forecast_df).encode(
