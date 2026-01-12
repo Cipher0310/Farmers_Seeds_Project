@@ -1,60 +1,76 @@
 import sqlite3
 import pandas as pd
-import joblib
-import os
+import pickle
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
 
-# 1. SETUP PATHS
-# We look for database.db in the same folder as this script
-db_path = "database.db"
+# --- CONFIG ---
+DB_PATH = "database.db"
+MODEL_PATH = "seed_predictor_model.pkl"
+ENCODER_PATH = "label_encoder.pkl"
 
-print(f"Connecting to database at: {db_path}")
-conn = sqlite3.connect(db_path)
+def train_model():
+    # 1. Load Data
+    conn = sqlite3.connect(DB_PATH)
+    
+    # We join products to get the name (for encoding)
+    query = """
+        SELECT 
+            p.name as product_name,
+            s.date_sold,
+            s.quantity,
+            s.is_monsoon, s.is_hot, s.is_holiday, 
+            s.is_cny, s.is_ramadan, s.is_deepavali
+        FROM sales_history s
+        JOIN products p ON s.product_id = p.id
+    """
+    df = pd.read_sql_query(query, conn)
+    conn.close()
 
-# 2. LOAD DATA (Including all 6 Context Flags)
-query = """
-SELECT sh.date_sold, p.name, sh.quantity, 
-       sh.is_monsoon, sh.is_hot, sh.is_holiday, sh.is_cny, sh.is_ramadan, sh.is_deepavali
-FROM sales_history sh
-JOIN products p ON sh.product_id = p.id
-"""
-df = pd.read_sql_query(query, conn)
-conn.close()
+    # 2. Preprocessing & Aggregation (Daily -> Monthly)
+    # Convert date to datetime
+    df['date_sold'] = pd.to_datetime(df['date_sold'])
+    df['month'] = df['date_sold'].dt.month
+    df['year'] = df['date_sold'].dt.year
 
-# 3. PREPARE DATE FEATURES
-df['date_sold'] = pd.to_datetime(df['date_sold'])
-df['month'] = df['date_sold'].dt.month
-df['year'] = df['date_sold'].dt.year
+    # Aggregate by Month + Product
+    # Logic: Sum quantity, but take the MAX of flags (if it happened that month, the flag is True)
+    monthly_df = df.groupby(['product_name', 'year', 'month']).agg({
+        'quantity': 'sum',
+        'is_monsoon': 'max',
+        'is_hot': 'max',
+        'is_holiday': 'max',
+        'is_cny': 'max',
+        'is_ramadan': 'max',
+        'is_deepavali': 'max'
+    }).reset_index()
 
-# 4. AGGREGATE DATA
-# We sum up the sales by Month + All Flags
-monthly_df = df.groupby([
-    'name', 'year', 'month', 
-    'is_monsoon', 'is_hot', 'is_holiday', 'is_cny', 'is_ramadan', 'is_deepavali'
-])['quantity'].sum().reset_index()
+    print(f"Training on {len(monthly_df)} monthly aggregated records...")
 
-# 5. ENCODE PRODUCT NAMES
-le = LabelEncoder()
-monthly_df['product_encoded'] = le.fit_transform(monthly_df['name'])
+    # 3. Encode Product Names
+    le = LabelEncoder()
+    monthly_df['product_encoded'] = le.fit_transform(monthly_df['product_name'])
 
-# 6. DEFINE INPUTS (X) AND TARGET (y)
-X = monthly_df[[
-    'product_encoded', 'month', 
-    'is_monsoon', 'is_hot', 'is_holiday', 'is_cny', 'is_ramadan', 'is_deepavali'
-]]
-y = monthly_df['quantity']
+    # 4. Define Features & Target
+    # Input: Product ID, Month, and the 6 Context Flags
+    X = monthly_df[[
+        'product_encoded', 'month', 
+        'is_monsoon', 'is_hot', 'is_holiday', 
+        'is_cny', 'is_ramadan', 'is_deepavali'
+    ]]
+    y = monthly_df['quantity']
 
-# 7. SPLIT & TRAIN
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # 5. Train Random Forest
+    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf.fit(X, y)
 
-print("Training Cultural-Aware AI Model...")
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+    # 6. Save Artifacts
+    with open(MODEL_PATH, 'wb') as f:
+        pickle.dump(rf, f)
+    with open(ENCODER_PATH, 'wb') as f:
+        pickle.dump(le, f)
 
-# 8. SAVE THE BRAIN
-joblib.dump(model, 'seed_predictor_model.pkl')
-joblib.dump(le, 'label_encoder.pkl')
+    print("--- SUCCESS: AI Model Trained & Saved ---")
 
-print("SUCCESS: AI trained with Cultural Awareness!")
+if __name__ == "__main__":
+    train_model()
