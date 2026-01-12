@@ -2,9 +2,9 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import altair as alt 
-from ai_engine import SeedAI  # <--- UPDATED IMPORT
+from ai_engine import SeedAI 
 import time
-import calendar # <--- ADDED for month names
+import calendar 
 
 # --- CUSTOM CSS ---
 def load_css():
@@ -53,12 +53,19 @@ def load_css():
             background-color: rgba(58, 90, 64, 0.1) !important;
         }
 
+        /* AI Container Styling */
         .ai-container {
-            background-color: #F1F8E9; border: 2px solid #3A5A40; border-radius: 15px; padding: 25px; margin-top: 20px; margin-bottom: 30px;
+            background-color: #F1F8E9; 
+            border: 2px solid #3A5A40; 
+            border-radius: 15px; 
+            padding: 25px; 
+            margin-top: 20px; 
+            margin-bottom: 30px;
         }
         .ai-title { color: #3A5A40; font-weight: 900; font-size: 1.5rem; margin-bottom: 10px; }
         .ai-desc { color: #333333; font-weight: 600; margin-bottom: 20px; }
 
+        /* Summary Cards Styling */
         .summary-container { display: flex; gap: 20px; margin-bottom: 30px; }
         .summary-card {
             background-color: white; padding: 25px; border-radius: 12px;
@@ -93,8 +100,31 @@ def load_css():
             margin-bottom: 15px;
             font-size: 1rem;
         }
+        
+        /* Farm Logo Styling */
+        .farm-logo {
+            font-size: 80px;
+            text-align: center;
+            margin-bottom: 10px;
+            display: block;
+        }
         </style>
     """, unsafe_allow_html=True)
+
+# --- DIALOG FOR RENAMING FARM ---
+# Uses st.dialog if available (Streamlit 1.34+), otherwise falls back to older method
+if hasattr(st, 'dialog'):
+    decorator = st.dialog
+else:
+    decorator = st.experimental_dialog
+
+@decorator("Edit Farm Name")
+def rename_farm_dialog():
+    st.write("Enter the new name for your farm:")
+    new_name = st.text_input("Farm Name", value=st.session_state.get('farm_name', 'My Farm'))
+    if st.button("Save Name"):
+        st.session_state['farm_name'] = new_name
+        st.rerun()
 
 # --- DATABASE FUNCTIONS ---
 def get_data():
@@ -108,7 +138,12 @@ def get_data():
     
     # FETCH USERNAME FROM SESSION
     username = st.session_state.get('username', 'Supplier')
-    farm_name = "Green Valley Farms"
+    
+    # INITIALIZE FARM NAME IF NOT SET
+    if 'farm_name' not in st.session_state:
+        st.session_state['farm_name'] = f"{username}'s Farm"
+    
+    farm_name = st.session_state['farm_name']
     
     return farm_name, username, df_products, df_sales
 
@@ -161,26 +196,41 @@ def show_dashboard():
         st.error(f"Database Error: {e}")
         st.stop()
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR (UPDATED) ---
     with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.image("https://cdn-icons-png.flaticon.com/512/497/497348.png", width=100) 
+        # UPDATED: Use the 🌱 emoji instead of the image link
+        st.markdown("<div class='farm-logo'>🌱</div>", unsafe_allow_html=True)
         st.title("SeSeed")
         st.markdown("**MANAGER PORTAL**")
         st.markdown("---")
         st.write(f"User: **{username}**")
+        # UPDATED: Use dynamic farm name
         st.write(f"Farm: **{farm_name}**")
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # --- HEADER ---
-    c1, c2 = st.columns([8,1])
-    c1.title(f"{farm_name} Dashboard")
+    # --- HEADER (UPDATED) ---
+    # c1 = Title, c2 = Rename Button, c3 = Logout
+    c1, c2, c3 = st.columns([6, 1.5, 1])
     
-    if c2.button("🚪 Log Out"):
-        st.session_state['logged_in'] = False
-        st.session_state['role'] = None
-        st.session_state['show_login'] = False
-        st.rerun()
+    with c1:
+        # UPDATED: Title uses dynamic farm name
+        st.title(f"{farm_name} Dashboard")
+    
+    with c2:
+        # UPDATED: Add Rename Button
+        if st.button("✏️ Rename", help="Change Farm Name"):
+            rename_farm_dialog()
+
+    with c3:
+        if st.button("🚪 Log Out"):
+            st.session_state['logged_in'] = False
+            st.session_state['role'] = None
+            st.session_state['show_login'] = False
+            # Clear farm name on logout so next user gets their own default
+            if 'farm_name' in st.session_state:
+                del st.session_state['farm_name']
+            st.rerun()
         
     st.markdown("---")
 
@@ -212,7 +262,9 @@ def show_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. AI FORECAST GRAPH (UPDATED TO CONNECT TO AI_ENGINE.PY)
+    # --- (UPDATED: REMOVED ANY EMPTY CONTAINERS HERE TO FIX BLANK BOX ISSUE) ---
+
+    # 2. AI FORECAST GRAPH
     st.markdown('<div class="ai-container">', unsafe_allow_html=True)
     st.markdown('<div class="ai-title">🧠 AI Demand Forecast (Next 12 Months)</div>', unsafe_allow_html=True)
     st.markdown('<div class="ai-desc">Visualizing future demand trends. Hover over the dots to see AI Reasoning.</div>', unsafe_allow_html=True)
@@ -224,7 +276,7 @@ def show_dashboard():
         product_row = df_products[df_products['name'] == selected_name].iloc[0]
         current_stock = product_row['stock']
         
-        # --- NEW FORECAST LOGIC ---
+        # --- FORECAST LOGIC ---
         forecast_data = []
         for m in range(1, 13):
             # Calls your new reasoning engine
@@ -288,7 +340,7 @@ def show_dashboard():
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("Update Stock"):
                     update_stock_in_db(prod_to_update, new_stock_val)
-                    st.success(f"Updated {prod_to_update} to {new_stock_val}!")
+                    st.toast(f"Updated {prod_to_update} to {new_stock_val}!")
                     time.sleep(1) 
                     st.rerun() 
 
@@ -325,7 +377,7 @@ def show_dashboard():
                 if st.button("🗑️ Delete Product"):
                     success = delete_product_from_db(prod_to_delete)
                     if success:
-                        st.error(f"Deleted {prod_to_delete} from database.")
+                        st.toast(f"Deleted {prod_to_delete} from database.")
                         time.sleep(1)
                         st.rerun()
                     else:

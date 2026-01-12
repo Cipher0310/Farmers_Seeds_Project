@@ -41,7 +41,6 @@ def farmer_dashboard(products):
     
     # If image is missing, use a generic icon URL or skip
     if not chat_icon_b64:
-        # Fallback to a simple text button if image fails, or just pass
         pass 
     
     if chat_icon_b64:
@@ -128,7 +127,7 @@ def farmer_dashboard(products):
             padding-top: 10px;
         }}
         
-        /* CENTER TOAST NOTIFICATION */
+        /* --- FIXED TOAST NOTIFICATION CSS --- */
         div[data-testid="stToast"] {{
             position: fixed !important;
             top: 50% !important;
@@ -138,8 +137,17 @@ def farmer_dashboard(products):
             min-width: 300px;
             z-index: 999999 !important;
             text-align: center;
-            background-color: white; 
+            background-color: white !important; 
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            /* ADDED: Force text color to black so it shows on white background */
+            color: #000000 !important;
+        }}
+        div[data-testid="stToast"] p {{
+            color: #000000 !important;
+            font-weight: bold;
+        }}
+        div[data-testid="stToast"] div {{
+            color: #000000 !important;
         }}
         </style>
     """, unsafe_allow_html=True)
@@ -406,6 +414,7 @@ def farmer_dashboard(products):
                     }
                     
                     st.session_state['cart'].append(order_item)
+                    # This Toast will now be visible (Black Text)
                     st.toast(f"Added {total_units} units of {prod['name']} to cart!")
                     st.session_state['selected_product'] = None
                     time.sleep(1)
@@ -415,13 +424,11 @@ def farmer_dashboard(products):
     else:
         st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
         
-        # Simplified Navigation (Removed Equipment)
-        nav_col1, nav_col2, nav_spacer = st.columns([1, 1.2, 4])
+        # --- FIXED: REMOVED "BROWSE SEEDS" BUTTON ---
+        nav_col1, nav_spacer = st.columns([1, 5])
         
         with nav_col1:
             st.button("Home", use_container_width=True, on_click=update_view, args=('all',))
-        with nav_col2:
-            st.button("Browse Seeds", use_container_width=True, on_click=update_view, args=('seeds',))
                 
         st.markdown("<hr style='margin-top: 5px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
