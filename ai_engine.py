@@ -45,72 +45,66 @@ class SeedAI:
     def predict_with_reasoning(self, product_name, month):
         # 1. Prepare Input
         try:
+            # Try to convert name to ID
             prod_id = self.le.transform([product_name])[0]
-        except ValueError:
-            return f"Error: Product '{product_name}' not found in training data."
+            
+            # --- NORMAL PREDICTION PATH (Known Product) ---
+            flags = self.get_context_flags(month)
+            
+            features = [
+                prod_id, month, 
+                flags['is_monsoon'], flags['is_hot'], flags['is_holiday'], 
+                flags['is_cny'], flags['is_ramadan'], flags['is_deepavali']
+            ]
+            
+            baseline_pred = int(self.model.predict([features])[0])
+            
+            # Reasoning Engine
+            reasons = []
+            check_list = [
+                ('is_ramadan', "Ramadan Spike"),
+                ('is_deepavali', "Deepavali Spike"),
+                ('is_cny', "CNY Spike"),
+                ('is_hot', "Hot Season Demand"),
+                ('is_holiday', "School Holiday Surge"),
+                ('is_monsoon', "Monsoon Drop")
+            ]
+            
+            idx_map = {
+                'is_monsoon': 2, 'is_hot': 3, 'is_holiday': 4, 
+                'is_cny': 5, 'is_ramadan': 6, 'is_deepavali': 7
+            }
+            
+            for flag_name, reason_text in check_list:
+                if flags[flag_name] == 1:
+                    cf_features = features.copy()
+                    cf_features[idx_map[flag_name]] = 0
+                    cf_pred = int(self.model.predict([cf_features])[0])
+                    diff = baseline_pred - cf_pred
+                    
+                    if diff > 100:
+                        reasons.append(reason_text)
+                    elif diff < -100:
+                        reasons.append(reason_text)
 
-        flags = self.get_context_flags(month)
-        
-        # Create the feature vector (Baseline)
-        # Order MUST match train_ai.py: [prod, month, monsoon, hot, holiday, cny, ramadan, deepavali]
-        features = [
-            prod_id, month, 
-            flags['is_monsoon'], flags['is_hot'], flags['is_holiday'], 
-            flags['is_cny'], flags['is_ramadan'], flags['is_deepavali']
-        ]
-        
-        # 2. Run Baseline Prediction
-        baseline_pred = int(self.model.predict([features])[0])
-        
-        # 3. THE REASONING ENGINE (Counterfactual Analysis)
-        reasons = []
-        
-        # UPDATED CHECK LIST: Now includes Hot Season and Holidays
-        check_list = [
-            ('is_ramadan', "Ramadan Spike"),
-            ('is_deepavali', "Deepavali Spike"),
-            ('is_cny', "CNY Spike"),
-            ('is_hot', "Hot Season Demand"),       # <-- NEW
-            ('is_holiday', "School Holiday Surge"), # <-- NEW
-            ('is_monsoon', "Monsoon Drop")
-        ]
-        
-        # Map feature names to their index in the 'features' list
-        idx_map = {
-            'is_monsoon': 2, 'is_hot': 3, 'is_holiday': 4, 
-            'is_cny': 5, 'is_ramadan': 6, 'is_deepavali': 7
-        }
-        
-        for flag_name, reason_text in check_list:
-            # Only test if the flag is actually ACTIVE for this month
-            if flags[flag_name] == 1:
-                # Create a "Counterfactual" (What if this flag was OFF?)
-                cf_features = features.copy()
-                
-                # Flip the bit (1 -> 0)
-                cf_features[idx_map[flag_name]] = 0
-                
-                # Predict Counterfactual
-                cf_pred = int(self.model.predict([cf_features])[0])
-                
-                # Calculate Impact
-                diff = baseline_pred - cf_pred
-                
-                # THRESHOLD LOGIC (Sensitivity: 100 units)
-                if diff > 100:
-                    reasons.append(reason_text)
-                elif diff < -100:
-                    reasons.append(reason_text)
+            reason_str = ", ".join(reasons) if reasons else "Standard Seasonal Demand"
+            
+            return {
+                "Product": product_name,
+                "Month": month,
+                "Predicted_Sales": baseline_pred,
+                "Reasoning": reason_str
+            }
 
-        # 4. Construct Output
-        reason_str = ", ".join(reasons) if reasons else "Standard Seasonal Demand"
-        
-        return {
-            "Product": product_name,
-            "Month": month,
-            "Predicted_Sales": baseline_pred,
-            "Reasoning": reason_str
-        }
+        except (ValueError, IndexError):
+            # --- FALLBACK PATH (Unknown / New Product) ---
+            # If the product is new (not in encoder), we return a default "Cold Start" value.
+            return {
+                "Product": product_name,
+                "Month": month,
+                "Predicted_Sales": 50,  # Default 'safe' value for new items
+                "Reasoning": "🆕 New Product / Insufficient Data"
+            }
 
 # --- TEST RUN ---
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ def confirm_delete_dialog():
     col1, col2 = st.columns(2)
     
     with col1:
+        # The styling for this button is handled in the CSS below
         if st.button("Yes, Delete", use_container_width=True, key="confirm_delete_btn"):
             st.session_state['cart'] = []
             st.rerun()
@@ -66,7 +67,7 @@ def farmer_dashboard(products):
         """, unsafe_allow_html=True)
 
     # =========================================================
-    # 2. STYLING & BACKGROUND (FIXED CONTRAST & DISABLED INPUTS)
+    # 2. STYLING & BACKGROUND
     # =========================================================
 
     st.markdown("""
@@ -77,41 +78,39 @@ def farmer_dashboard(products):
             background-image: none !important;
         }
 
-        /* 2. Global Text Color (Dark Green for Readability on Light Background) */
+        /* 2. Global Text Color */
         h1, h2, h3, h4, h5, h6, p, div, span, label, li {
             color: #1a472a !important; 
         }
         
-        /* 3. BUTTON STYLING (FIXED TEXT VISIBILITY) */
+        /* 3. BUTTON STYLING */
         div.stButton > button p {
             color: #ffffff !important; 
         }
         
         div.stButton > button {
-            background-color: #1b5e20 !important; /* Deep Green Button */
+            background-color: #1b5e20 !important;
             border: none !important;
             border-radius: 8px;
             font-weight: bold !important;
         }
 
         div.stButton > button:hover {
-            background-color: #2e7d32 !important; /* Lighter Green on Hover */
+            background-color: #2e7d32 !important;
             color: white !important;
         }
         
-        /* 4. INPUT FIELD STYLING (FIXED DISABLED TEXT) */
-        /* Normal Inputs */
+        /* 4. INPUT FIELD STYLING */
         .stTextInput input, .stNumberInput input {
             color: #000000 !important;
             background-color: #ffffff !important;
         }
         
-        /* Disabled Inputs (The 'Min' box) */
         .stTextInput input[disabled], .stNumberInput input[disabled] {
             color: #000000 !important;
-            -webkit-text-fill-color: #000000 !important; /* Fix for Safari/Chrome */
-            opacity: 1 !important; /* Prevent greying out */
-            background-color: #f0f0f0 !important; /* Slight grey background to indicate disabled */
+            -webkit-text-fill-color: #000000 !important;
+            opacity: 1 !important;
+            background-color: #f0f0f0 !important;
             font-weight: bold !important;
         }
 
@@ -126,19 +125,71 @@ def farmer_dashboard(products):
             color: #1a472a !important;
         }
         
-        /* TOAST NOTIFICATION */
+        /* --- BIGGER & CENTERED TOAST NOTIFICATION --- */
         div[data-testid="stToast"] {
             background-color: white !important; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 50vw !important;
+            min-width: 400px;
+            padding: 30px !important;
+            border-radius: 15px !important;
+            z-index: 999999;
         }
-        div[data-testid="stToast"] p {
-            color: #000000 !important; /* Force Toast text black */
+        div[data-testid="stToast"] > div {
+            font-size: 1.8rem !important;
+            text-align: center !important;
+            color: #000000 !important; /* Force black text */
+        }
+        
+        /* --- BIGGER & CENTERED WARNING MESSAGE --- */
+        div[data-testid="stAlert"][data-baseweb="notification"] {
+            font-size: 1.5rem !important;
+            padding: 25px !important;
+            width: 60vw !important;
+            margin: 20px auto !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        /* Force warning text color for readability in both modes */
+        div[data-testid="stAlert"] * {
+             color: #333333 !important;
+        }
+
+        /* --- VISIBLE CONFIRMATION DIALOG (DARK MODE FIX) --- */
+        /* Target the modal container */
+        div[data-testid="stModal"] > div {
+            background-color: #ffffff !important; /* Force white background */
+            color: #000000 !important; /* Force black text */
+            border-radius: 15px !important;
+            padding: 30px !important;
+        }
+        /* Target dialog buttons for contrast */
+        div[data-testid="stModal"] button {
+             background-color: #f0f0f0 !important;
+             color: #000000 !important;
+             border: 1px solid #ccc !important;
+        }
+        div[data-testid="stModal"] button:hover {
+             background-color: #e0e0e0 !important;
+        }
+        /* Make the 'Yes, Delete' button red */
+        div[data-testid="stModal"] div[data-testid="column"]:nth-of-type(1) button {
+            background-color: #d32f2f !important;
+            color: white !important;
+            border: none !important;
+        }
+        div[data-testid="stModal"] div[data-testid="column"]:nth-of-type(1) button:hover {
+            background-color: #b71c1c !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
     # =========================================================
-    # 3. CHATBOT VIEW SWITCH (NATIVE STREAMLIT CHAT)
+    # 3. CHATBOT VIEW SWITCH
     # =========================================================
     
     if "messages" not in st.session_state:
@@ -303,6 +354,7 @@ def farmer_dashboard(products):
             
             b_space, b1, b_gap, b2, b_space2 = st.columns([1, 2, 0.6, 2, 1])
             with b1:
+                # This button triggers the styled confirmation dialog
                 if st.button("Delete All Items", use_container_width=True):
                     confirm_delete_dialog()
             with b2:
