@@ -100,3 +100,80 @@ def ask_ai(user_question):
         return response.text
     except Exception as e:
         return f"Sorry, I'm having trouble thinking right now. (Error: {str(e)})"
+    
+# ==========================================
+# --- ADD THESE IMPORTS AT THE TOP ---
+# ==========================================
+import google.generativeai as genai
+import os
+# ... existing imports ...
+# NEW IMPORTS FOR VOICE:
+import speech_recognition as sr
+from gtts import gTTS
+import io
+import tempfile
+
+# ... (Your existing configure_gemini and ask_ai functions remain here) ...
+
+
+# ==========================================
+# --- ADD THESE NEW FUNCTIONS AT THE END ---
+# ==========================================
+
+def transcribe_audio(audio_bytes):
+    """
+    Takes raw audio bytes from the browser recorder, saves them temporarily,
+    and uses Google Speech Recognition to transcribe them to text.
+    """
+    r = sr.Recognizer()
+    text = None
+
+    try:
+        # 1. Save the raw bytes to a temporary WAV file
+        # Browser audio often comes in webm format, but saving as .wav often works 
+        # for speech_recognition to read the headers correctly.
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio_file:
+            tmp_audio_file.write(audio_bytes)
+            tmp_audio_path = tmp_audio_file.name
+
+        # 2. Read the temporary file into the recognizer
+        with sr.AudioFile(tmp_audio_path) as source:
+            # Adjust for ambient noise if necessary, though often fine without for quick commands
+            # r.adjust_for_ambient_noise(source) 
+            audio_data = r.record(source)
+
+        # 3. Perform Google Speech Recognition (requires internet)
+        text = r.recognize_google(audio_data)
+        print(f"✅ Transcription successful: {text}")
+
+    except sr.UnknownValueError:
+        print("Generation Error: Could not understand audio")
+    except sr.RequestError as e:
+        print(f"Generation Error: Could not request results from Google Speech Recognition service; {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred during transcription: {e}")
+    finally:
+        # 4. Clean up temp file
+        if 'tmp_audio_path' in locals() and os.path.exists(tmp_audio_path):
+            os.remove(tmp_audio_path)
+            
+    return text
+
+def text_to_speech_bytes(text, lang='en'):
+    """
+    Converts text to speech using gTTS and returns the audio data as bytes
+    (in-memory, without saving to disk).
+    """
+    try:
+        tts = gTTS(text=text, lang=lang, slow=False)
+        
+        # Create an in-memory byte buffer
+        mp3_fp = io.BytesIO()
+        # Write the audio data to the buffer
+        tts.write_to_fp(mp3_fp)
+        # Get the bytes values
+        audio_bytes = mp3_fp.getvalue()
+        return audio_bytes
+    except Exception as e:
+        print(f"TTS Error: {e}")
+        return None

@@ -3,6 +3,9 @@ import time
 import os
 import streamlit.components.v1 as components 
 from utils import get_base64_of_bin_file
+# --- NEW IMPORT FOR VOICE ---
+from streamlit_mic_recorder import mic_recorder
+import backend # Ensure backend is imported
 
 # --- CONFIRMATION DIALOG FUNCTION ---
 if hasattr(st, 'dialog'):
@@ -74,7 +77,7 @@ def farmer_dashboard(products):
         <style>
         /* 1. Force Light Green Background */
         .stApp {
-            background-color: #E8F5E9 !important; /* Light Mint Green */
+            background-color: #E8F5E9 !important;
             background-image: none !important;
         }
 
@@ -87,14 +90,12 @@ def farmer_dashboard(products):
         div.stButton > button p {
             color: #ffffff !important; 
         }
-        
         div.stButton > button {
             background-color: #1b5e20 !important;
             border: none !important;
             border-radius: 8px;
             font-weight: bold !important;
         }
-
         div.stButton > button:hover {
             background-color: #2e7d32 !important;
             color: white !important;
@@ -105,13 +106,27 @@ def farmer_dashboard(products):
             color: #000000 !important;
             background-color: #ffffff !important;
         }
-        
         .stTextInput input[disabled], .stNumberInput input[disabled] {
             color: #000000 !important;
             -webkit-text-fill-color: #000000 !important;
             opacity: 1 !important;
             background-color: #f0f0f0 !important;
             font-weight: bold !important;
+        }
+
+        /* 5. ITEM CARD BORDERS */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-color: #1a472a !important;
+            border-width: 2px !important;
+            border-style: solid !important;
+            border-radius: 10px !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+            padding: 10px !important;
+        }
+        
+        [data-testid="stVerticalBlockBorderWrapper"] > div {
+            border: none !important;
         }
 
         /* Cart Page Total */
@@ -125,7 +140,7 @@ def farmer_dashboard(products):
             color: #1a472a !important;
         }
         
-        /* --- BIGGER & CENTERED TOAST NOTIFICATION --- */
+        /* Toast Notification */
         div[data-testid="stToast"] {
             background-color: white !important; 
             box-shadow: 0 4px 20px rgba(0,0,0,0.2);
@@ -142,10 +157,10 @@ def farmer_dashboard(products):
         div[data-testid="stToast"] > div {
             font-size: 1.8rem !important;
             text-align: center !important;
-            color: #000000 !important; /* Force black text */
+            color: #000000 !important;
         }
         
-        /* --- BIGGER & CENTERED WARNING MESSAGE --- */
+        /* Warnings & Dialogs */
         div[data-testid="stAlert"][data-baseweb="notification"] {
             font-size: 1.5rem !important;
             padding: 25px !important;
@@ -154,20 +169,15 @@ def farmer_dashboard(products):
             border-radius: 12px !important;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        /* Force warning text color for readability in both modes */
         div[data-testid="stAlert"] * {
              color: #333333 !important;
         }
-
-        /* --- VISIBLE CONFIRMATION DIALOG (DARK MODE FIX) --- */
-        /* Target the modal container */
         div[data-testid="stModal"] > div {
-            background-color: #ffffff !important; /* Force white background */
-            color: #000000 !important; /* Force black text */
+            background-color: #ffffff !important;
+            color: #000000 !important;
             border-radius: 15px !important;
             padding: 30px !important;
         }
-        /* Target dialog buttons for contrast */
         div[data-testid="stModal"] button {
              background-color: #f0f0f0 !important;
              color: #000000 !important;
@@ -176,7 +186,6 @@ def farmer_dashboard(products):
         div[data-testid="stModal"] button:hover {
              background-color: #e0e0e0 !important;
         }
-        /* Make the 'Yes, Delete' button red */
         div[data-testid="stModal"] div[data-testid="column"]:nth-of-type(1) button {
             background-color: #d32f2f !important;
             color: white !important;
@@ -185,16 +194,38 @@ def farmer_dashboard(products):
         div[data-testid="stModal"] div[data-testid="column"]:nth-of-type(1) button:hover {
             background-color: #b71c1c !important;
         }
+
+        /* --- NEW STYLING FOR MIC RECORDER --- */
+        /* Center the mic button */
+        div[data-testid="stColumn"] > div > div > div > button[title="Start recording"] {
+            margin: 0 auto;
+            display: block;
+            background-color: #d32f2f; /* Red for recording */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            border: none;
+        }
+         div[data-testid="stColumn"] > div > div > div > button[title="Stop recording"] {
+             margin: 0 auto;
+            display: block;
+            background-color: #1a472a; /* Green for stop */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+             border: none;
+         }
         </style>
     """, unsafe_allow_html=True)
 
     # =========================================================
-    # 3. CHATBOT VIEW SWITCH
+    # 3. CHATBOT VIEW SWITCH (UPDATED FOR VOICE)
     # =========================================================
     
     if "messages" not in st.session_state:
+        # Using a slightly different structure to hold audio bytes if they exist
         st.session_state["messages"] = [
-            {"role": "assistant", "content": "Hello! I am Seseedy. Ask me about seeds, planting guides, or how to use this website!"}
+            {"role": "assistant", "content": "Hello! I am Seseedy. Ask me about seeds, planting guides, or how to use this website!", "audio": None}
         ]
 
     if 'show_chatbot' not in st.session_state:
@@ -213,28 +244,73 @@ def farmer_dashboard(products):
 
         st.markdown("---")
 
+        # 1. Display History
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
+                # If this message has associated audio, play it
+                if msg.get("audio"):
+                    st.audio(msg["audio"], format="audio/mp3")
 
-        import backend
+        # 2. Voice Input Controls
+        # We place the mic recorder just above the chat input
+        st.write("Tap microphone to speak:")
+        cmic1, cmic2, cmic3 = st.columns([2,1,2]) # Center the button
+        with cmic2:
+            # This component handles browser-based recording
+            audio_data = mic_recorder(
+                start_prompt="🎤 Start",
+                stop_prompt="🟥 Stop", 
+                key='voice_recorder',
+                just_once=True, # Important: Resets after use so it doesn't keep sending old audio
+                use_container_width=True
+            )
 
-        if prompt := st.chat_input("Ask about seeds, planting, or equipment..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
+        # 3. Logic to handle inputs (either voice OR text)
+        prompt = None
+        
+        # Check Voice Input First
+        if audio_data and audio_data['bytes']:
+            with st.spinner("Listening and transcribing..."):
+                # Send audio bytes to backend for transcription
+                transcribed_text = backend.transcribe_audio(audio_data['bytes'])
+                if transcribed_text:
+                    prompt = transcribed_text
+                else:
+                    st.error("Sorry, I couldn't understand the audio. Please try again.")
+
+        # Check Text Input Second (if no voice input processed)
+        if prompt is None:
+            prompt = st.chat_input("Ask about seeds, planting, or equipment...")
+
+        # 4. Process Prompt (if either voice or text provided)
+        if prompt:
+            # A. Display user message
+            st.session_state.messages.append({"role": "user", "content": prompt, "audio": None})
             with st.chat_message("user"):
                 st.markdown(prompt)
 
+            # B. Generate AI Response & TTS Audio
             with st.chat_message("assistant"):
                 with st.spinner("Seseedy is thinking..."):
-                    response = backend.ask_ai(prompt)
-                    st.markdown(response)
+                    # 1. Get Text Response
+                    response_text = backend.ask_ai(prompt)
+                    st.markdown(response_text)
+                    
+                    # 2. Get Audio Response (TTS)
+                    # We use a separate spinner for audio generation as it might take a moment
+                    with st.spinner("Generating audio response..."):
+                        tts_audio_bytes = backend.text_to_speech_bytes(response_text)
+                        if tts_audio_bytes:
+                            st.audio(tts_audio_bytes, format="audio/mp3")
             
-            st.session_state.messages.append({"role": "assistant", "content": response})
+            # C. Save AI message to history
+            st.session_state.messages.append({"role": "assistant", "content": response_text, "audio": tts_audio_bytes})
 
         return 
 
     # =========================================================
-    # 4. DASHBOARD LOGIC
+    # 4. DASHBOARD LOGIC (Remains unchanged)
     # =========================================================
 
     def update_view(category):
@@ -354,7 +430,6 @@ def farmer_dashboard(products):
             
             b_space, b1, b_gap, b2, b_space2 = st.columns([1, 2, 0.6, 2, 1])
             with b1:
-                # This button triggers the styled confirmation dialog
                 if st.button("Delete All Items", use_container_width=True):
                     confirm_delete_dialog()
             with b2:
@@ -528,6 +603,7 @@ def farmer_dashboard(products):
                 cols = st.columns(3, gap="medium")
                 for i, p in enumerate(row):
                     with cols[i]:
+                        # THIS is the container that gets the border styling
                         with st.container(border=True):
                             st.markdown(f"""
                                 <div style="height: 200px; overflow: hidden; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; background-color: white;">
