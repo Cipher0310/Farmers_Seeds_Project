@@ -37,11 +37,7 @@ def farmer_dashboard(products):
         st.query_params.clear() 
         st.rerun()
 
-    chat_icon_b64 = get_base64_of_bin_file("images/Screenshot 2025-12-28 232049.png") # Ensure path is correct
-    
-    # If image is missing, use a generic icon URL or skip
-    if not chat_icon_b64:
-        pass 
+    chat_icon_b64 = get_base64_of_bin_file("images/Screenshot 2025-12-28 232049.png") 
     
     if chat_icon_b64:
         st.markdown(f"""
@@ -70,85 +66,65 @@ def farmer_dashboard(products):
         """, unsafe_allow_html=True)
 
     # =========================================================
-    # 2. STYLING & BACKGROUND
+    # 2. STYLING & BACKGROUND (FIXED CONTRAST)
     # =========================================================
 
-    bg_encoded = get_base64_of_bin_file("background.png") # Ensure path is correct
-    if bg_encoded:
-        bg_style = f'background-image: url("data:image/png;base64,{bg_encoded}"); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;'
-    else:
-        bg_style = "background-image: none;"
-
-    st.markdown(f"""
+    st.markdown("""
         <style>
-        .stApp {{ {bg_style} }}
-        
-        /* General Button Style */
-        div[data-testid="stVerticalBlock"] div.stButton > button {{
-            background-color: #3e5c43 !important;
-            color: white !important;
-            border-radius: 5px;
-            border: none;
-            width: 100%;
-        }}
-        div[data-testid="stVerticalBlock"] div.stButton > button:hover {{
-            background-color: #2e4632 !important;
-            color: white !important;
-        }}
+        /* 1. Force Light Green Background */
+        .stApp {
+            background-color: #E8F5E9 !important; /* Light Mint Green */
+            background-image: none !important;
+        }
 
-        /* Customer Service/Chat button (Black) */
-        div[data-testid="column"]:nth-of-type(1) div[data-testid="stVerticalBlock"] > div.stButton:last-of-type > button {{
-            background-color: #000000 !important;
-            border-color: #000000 !important;
-            color: #ffffff !important;
-        }}
-        div[data-testid="column"]:nth-of-type(1) div[data-testid="stVerticalBlock"] > div.stButton:last-of-type > button:hover {{
-            background-color: #333333 !important;
+        /* 2. Global Text Color (Dark Green for Readability on Light Background) */
+        h1, h2, h3, h4, h5, h6, p, div, span, label, li {
+            color: #1a472a !important; 
+        }
+        
+        /* 3. BUTTON STYLING (FIXED TEXT VISIBILITY) */
+        /* This forces the button text (which is often a <p> tag) to be WHITE */
+        div.stButton > button p {
+            color: #ffffff !important; 
+        }
+        
+        div.stButton > button {
+            background-color: #1b5e20 !important; /* Deep Green Button */
+            border: none !important;
+            border-radius: 8px;
+            font-weight: bold !important;
+        }
+
+        div.stButton > button:hover {
+            background-color: #2e7d32 !important; /* Lighter Green on Hover */
             color: white !important;
-        }}
+        }
         
-        /* SEARCH BUTTON STYLING */
-        div[data-testid="column"]:nth-of-type(3) div[data-testid="stVerticalBlock"] button {{
-            background-color: white !important;
-            border: 1px solid #cccccc !important;
-            color: inherit !important;
-        }}
-        div[data-testid="column"]:nth-of-type(3) div[data-testid="stVerticalBlock"] button:hover {{
-            background-color: #f0f0f0 !important;
-        }}
-        
-        /* Cart Page Styles */
-        .cart-total {{
+        /* Ensure Inputs have visible text (Black on White) */
+        .stTextInput input, .stNumberInput input {
+            color: #000000 !important;
+            background-color: #ffffff !important;
+        }
+
+        /* Cart Page Total */
+        .cart-total {
             font-size: 1.5em;
             font-weight: bold;
             text-align: right;
             margin-top: 20px;
-            border-top: 2px solid #333;
+            border-top: 2px solid #1a472a;
             padding-top: 10px;
-        }}
+            color: #1a472a !important;
+        }
         
-        /* --- FIXED TOAST NOTIFICATION CSS --- */
-        div[data-testid="stToast"] {{
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            width: auto !important;
-            min-width: 300px;
-            z-index: 999999 !important;
-            text-align: center;
+        /* TOAST NOTIFICATION */
+        div[data-testid="stToast"] {
             background-color: white !important; 
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            /* ADDED: Force text color to black so it shows on white background */
-            color: #000000 !important;
-        }}
-        div[data-testid="stToast"] p {{
-            color: #000000 !important;
-            font-weight: bold;
-        }}
-        div[data-testid="stToast"] div {{
-            color: #000000 !important;
-        }}
+        }
+        div[data-testid="stToast"] p {
+            color: #000000 !important; /* Force Toast text black */
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -156,20 +132,17 @@ def farmer_dashboard(products):
     # 3. CHATBOT VIEW SWITCH (NATIVE STREAMLIT CHAT)
     # =========================================================
     
-    # Initialize Chat History if not present
     if "messages" not in st.session_state:
         st.session_state["messages"] = [
             {"role": "assistant", "content": "Hello! I am Seseedy. Ask me about seeds, planting guides, or how to use this website!"}
         ]
 
-    # Check if chatbot should be shown
     if 'show_chatbot' not in st.session_state:
         st.session_state['show_chatbot'] = False
 
     if st.session_state['show_chatbot']:
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Header with Back Button
         c_back, c_title = st.columns([1, 5])
         with c_back:
             if st.button("← Back"):
@@ -180,38 +153,30 @@ def farmer_dashboard(products):
 
         st.markdown("---")
 
-        # 1. Display Chat History
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-        # 2. Chat Input & Response Logic
-        # This imports the 'ask_ai' function from your backend.py file
         import backend
 
         if prompt := st.chat_input("Ask about seeds, planting, or equipment..."):
-            # Show User Message
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-            # Get AI Response
             with st.chat_message("assistant"):
                 with st.spinner("Seseedy is thinking..."):
-                    # CALL THE PYTHON BACKEND DIRECTLY
                     response = backend.ask_ai(prompt)
                     st.markdown(response)
             
-            # Save AI Message
             st.session_state.messages.append({"role": "assistant", "content": response})
 
-        return # Stop execution so we don't show the dashboard underneath
+        return 
 
     # =========================================================
     # 4. DASHBOARD LOGIC
     # =========================================================
 
-    # --- CALLBACKS ---
     def update_view(category):
         st.session_state['view_category'] = category
         st.session_state['search_input'] = ""
@@ -244,7 +209,7 @@ def farmer_dashboard(products):
             st.rerun()
 
     with head1:
-        st.markdown("### <div style='white-space: nowrap;'>🌱 *SeSeed* &nbsp; <span style='color:#3e5c43; font-size:1.2rem'>Farmer's Seeds</span></div>", unsafe_allow_html=True)
+        st.markdown("### <div style='white-space: nowrap;'>🌱 *SeSeed* &nbsp; <span style='font-size:1.2rem'>Farmer's Seeds</span></div>", unsafe_allow_html=True)
     
     with head2:
         search_col1, search_col2 = st.columns([5, 1])
@@ -337,7 +302,7 @@ def farmer_dashboard(products):
                     st.session_state['show_cart_modal'] = False
                     st.rerun()
 
-    # B. VIEW: PRODUCT DETAILS (NO REVIEWS, NO EQUIPMENT)
+    # B. VIEW: PRODUCT DETAILS
     elif st.session_state['selected_product']:
         prod = st.session_state['selected_product']
         
@@ -348,8 +313,6 @@ def farmer_dashboard(products):
             
         st.markdown(f"## {prod['name']}")
         
-        # Single column layout for clarity since reviews are gone
-        # Using a container to center visually
         with st.container():
             img_packet = prod.get('image', '')
             img_seed = prod.get('image_seed', img_packet)
@@ -360,7 +323,7 @@ def farmer_dashboard(products):
             def render_detail_image(label, img_src):
                 st.caption(label)
                 st.markdown(f"""
-                    <div style="height: 250px; display: flex; justify-content: center; align-items: center; background-color: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                    <div style="height: 250px; display: flex; justify-content: center; align-items: center; background-color: #ffffff; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px;">
                         <img src="{img_src}" style="max-height: 100%; max-width: 100%; object-fit: contain;">
                     </div>
                 """, unsafe_allow_html=True)
@@ -380,7 +343,6 @@ def farmer_dashboard(products):
         st.subheader("Order Quantity")
         box_qty = 0
         
-        # Standard Seed Ordering Logic
         q_c1, q_c2 = st.columns([2, 1])
         with q_c1:
             st.write(f"*Packet* (RM {prod['price']:.2f})")
@@ -396,8 +358,7 @@ def farmer_dashboard(products):
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- MODIFIED: CENTER AND RESIZE BUTTON ---
-        b_col1, b_col2, b_col3 = st.columns([1, 2, 1]) # [1,2,1] Creates a centered button with 50% width
+        b_col1, b_col2, b_col3 = st.columns([1, 2, 1]) 
         with b_col2:
             if st.button("Add to Cart", use_container_width=True, key="place_order_final"):
                 if packet_qty == 0 and box_qty == 0:
@@ -414,23 +375,27 @@ def farmer_dashboard(products):
                     }
                     
                     st.session_state['cart'].append(order_item)
-                    # This Toast will now be visible (Black Text)
                     st.toast(f"Added {total_units} units of {prod['name']} to cart!")
                     st.session_state['selected_product'] = None
                     time.sleep(1)
                     st.rerun()
 
-    # C. VIEW: NORMAL GRID VIEW (NO EQUIPMENT)
+    # C. VIEW: NORMAL GRID VIEW
     else:
         st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
         
-        # --- FIXED: REMOVED "BROWSE SEEDS" BUTTON ---
-        nav_col1, nav_spacer = st.columns([1, 5])
+        # --- NAV LAYOUT ---
+        nav_home, nav_cs, nav_spacer = st.columns([1, 1.5, 4.5])
         
-        with nav_col1:
+        with nav_home:
             st.button("Home", use_container_width=True, on_click=update_view, args=('all',))
+            
+        with nav_cs:
+             if st.button("🎧 Customer Service", use_container_width=True):
+                st.session_state['show_chatbot'] = True
+                st.rerun()
                 
-        st.markdown("<hr style='margin-top: 5px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin-top: 5px; margin-bottom: 20px; border-color: #1a472a;'>", unsafe_allow_html=True)
 
         c_filt, c_prod = st.columns([1, 4], gap="large")
 
@@ -442,7 +407,6 @@ def farmer_dashboard(products):
             st.button("🍉 Fruit", use_container_width=True, on_click=update_view, args=('Fruit',))
             st.button("🥬 Leafy Greens", use_container_width=True, on_click=update_view, args=('Leafy Greens',))
             st.button("🥕 Vegetable", use_container_width=True, on_click=update_view, args=('Vegetable',))
-            # REMOVED: Farming Equipment button
 
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.markdown("##### Price")
@@ -460,12 +424,6 @@ def farmer_dashboard(products):
                     on_change=update_price_from_text,
                     help="Must be greater than 0"
                 )
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if st.button("🎧 Customer Service", use_container_width=True):
-                st.session_state['show_chatbot'] = True
-                st.rerun()
 
         with c_prod:
             title_map = {
@@ -476,13 +434,11 @@ def farmer_dashboard(products):
                 'Fruit': "Fruits",
                 'Vegetable': "Vegetables"
             }
-            # Fallback for category names that might not exactly match key
             page_title = title_map.get(st.session_state['view_category'], st.session_state['view_category'])
             st.markdown(f"##### {page_title}")
 
             filtered_products = products
             
-            # Filtering Logic
             if search_query:
                 filtered_products = [
                     p for p in products 
@@ -495,11 +451,7 @@ def farmer_dashboard(products):
                 ]
             else:
                 current_view = st.session_state['view_category']
-                
-                if current_view == 'seeds':
-                    # Just show everything since equipment is gone
-                    pass 
-                elif current_view != 'all':
+                if current_view != 'all' and current_view != 'seeds':
                     filtered_products = [p for p in filtered_products if p['category'] == current_view]
                     
                 filtered_products = [
@@ -510,7 +462,6 @@ def farmer_dashboard(products):
             if not filtered_products:
                 st.warning("No products found matching your criteria.")
 
-            # Grid Layout
             rows = [filtered_products[i:i + 3] for i in range(0, len(filtered_products), 3)]
             for row in rows:
                 cols = st.columns(3, gap="medium")
@@ -518,14 +469,13 @@ def farmer_dashboard(products):
                     with cols[i]:
                         with st.container(border=True):
                             st.markdown(f"""
-                                <div style="height: 200px; overflow: hidden; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f9fa;">
+                                <div style="height: 200px; overflow: hidden; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; background-color: white;">
                                     <img src="{p['image']}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                                 </div>
                                 """, unsafe_allow_html=True)
                             
-                            st.markdown(f"*{p['name']}*")
-                            # REMOVED: Rating display
-                            st.markdown(f"*RM {p['price']:.2f}*")
+                            st.markdown(f"**{p['name']}**")
+                            st.markdown(f"**RM {p['price']:.2f}**")
                             
                             if st.button("ORDER", key=f"select_{p['id']}", use_container_width=True):
                                 st.session_state['selected_product'] = p
