@@ -66,7 +66,7 @@ def farmer_dashboard(products):
         """, unsafe_allow_html=True)
 
     # =========================================================
-    # 2. STYLING & BACKGROUND (FIXED CONTRAST)
+    # 2. STYLING & BACKGROUND (FIXED CONTRAST & DISABLED INPUTS)
     # =========================================================
 
     st.markdown("""
@@ -83,7 +83,6 @@ def farmer_dashboard(products):
         }
         
         /* 3. BUTTON STYLING (FIXED TEXT VISIBILITY) */
-        /* This forces the button text (which is often a <p> tag) to be WHITE */
         div.stButton > button p {
             color: #ffffff !important; 
         }
@@ -100,10 +99,20 @@ def farmer_dashboard(products):
             color: white !important;
         }
         
-        /* Ensure Inputs have visible text (Black on White) */
+        /* 4. INPUT FIELD STYLING (FIXED DISABLED TEXT) */
+        /* Normal Inputs */
         .stTextInput input, .stNumberInput input {
             color: #000000 !important;
             background-color: #ffffff !important;
+        }
+        
+        /* Disabled Inputs (The 'Min' box) */
+        .stTextInput input[disabled], .stNumberInput input[disabled] {
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important; /* Fix for Safari/Chrome */
+            opacity: 1 !important; /* Prevent greying out */
+            background-color: #f0f0f0 !important; /* Slight grey background to indicate disabled */
+            font-weight: bold !important;
         }
 
         /* Cart Page Total */
