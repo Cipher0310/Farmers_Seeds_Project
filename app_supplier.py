@@ -11,11 +11,10 @@ import datetime
 def load_css():
     st.markdown("""
         <style>
-        section[data-testid="stSidebar"] > div:first-child button { display: none !important; }
-        [data-testid="collapsedControl"] { display: none !important; }
-        [data-testid="stToolbar"] { display: none !important; }
-        div[data-testid="stDecoration"] { display: none !important; }
-
+        /* ========================================= */
+        /* GLOBAL STYLES (Applies to all screens)    */
+        /* ========================================= */
+        
         .stApp {
             background-image: linear-gradient(rgba(250, 249, 246, 0.96), rgba(250, 249, 246, 0.96)), 
             url('https://images.unsplash.com/photo-1610348725531-843dff563e2c?q=80&w=2070&auto=format&fit=crop');
@@ -65,7 +64,9 @@ def load_css():
         .ai-title { color: #3A5A40; font-weight: 900; font-size: 1.5rem; margin-bottom: 10px; }
         .ai-desc { color: #333333; font-weight: 600; margin-bottom: 20px; }
 
+        /* Summary Cards Container */
         .summary-container { display: flex; gap: 20px; margin-bottom: 30px; }
+        
         .summary-card {
             background-color: white; padding: 25px; border-radius: 12px;
             border: 1px solid #d4d1c9; flex: 1; text-align: center;
@@ -105,6 +106,55 @@ def load_css():
             text-align: center;
             margin-bottom: 10px;
             display: block;
+        }
+
+        /* ========================================= */
+        /* DESKTOP ONLY: Hide Sidebar Toggle         */
+        /* ========================================= */
+        @media (min-width: 769px) {
+            section[data-testid="stSidebar"] > div:first-child button { display: none !important; }
+            [data-testid="collapsedControl"] { display: none !important; }
+            div[data-testid="stDecoration"] { display: none !important; }
+            [data-testid="stToolbar"] { display: none !important; }
+        }
+
+        /* ========================================= */
+        /* MOBILE OPTIMIZATIONS (Phone/Tablet)       */
+        /* ========================================= */
+        @media only screen and (max-width: 768px) {
+            
+            /* 1. ENABLE SIDEBAR TOGGLE ON MOBILE */
+            [data-testid="collapsedControl"] { 
+                display: block !important; 
+                color: #000000 !important; /* Make hamburger menu visible/black */
+                z-index: 10000 !important;
+            }
+            
+            /* 2. Adjust Sidebar width on mobile */
+            section[data-testid="stSidebar"] {
+                width: 100% !important; /* When open, cover screen (standard mobile behavior) */
+            }
+
+            /* 3. Stack Summary Cards Vertically */
+            .summary-container {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+            .summary-card {
+                width: 100% !important;
+                margin-bottom: 5px !important;
+            }
+
+            /* 4. Adjust Text Sizes */
+            h1 { font-size: 1.8rem !important; }
+            .farm-logo { font-size: 50px !important; }
+            .ai-title { font-size: 1.3rem !important; }
+            
+            /* 5. Make buttons touch-friendly */
+            div.stButton > button {
+                min-height: 50px !important;
+                font-size: 1rem !important;
+            }
         }
         </style>
     """, unsafe_allow_html=True)
