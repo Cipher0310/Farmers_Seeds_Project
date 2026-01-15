@@ -1,3 +1,4 @@
+import sqlite3
 import streamlit as st
 import google.generativeai as genai
 import os
@@ -51,25 +52,50 @@ def initialize_session_state():
             {"role": "assistant", "content": "Hello! I am Seseedy. Ask me about seeds, planting guides, or how to use this website!"}
         ]
 
-# --- 3. AI ANSWER FUNCTION ---
+# --- 3. AI ANSWER FUNCTION (UPDATED) ---
 def ask_ai(user_question):
     if not model:
         return "I am currently offline (API Key missing)."
     
+    # 1. FETCH PRODUCT DATA DYNAMICALLY
+    product_context = ""
     try:
-        # Context for the AI so it knows who it is
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, price, category, stock FROM products")
+        products = cursor.fetchall()
+        conn.close()
+        
+        # Format the data into a readable string for the AI
+        if products:
+            product_list = "\n".join([f"- {p[0]}: RM {p[1]:.2f} ({p[2]}) - {p[3]} in stock" for p in products])
+            product_context = f"CURRENT INVENTORY & PRICES:\n{product_list}\n"
+        else:
+            product_context = "Inventory is currently empty."
+            
+    except Exception as e:
+        product_context = "Error retrieving inventory data."
+
+    try:
+        # 2. UPDATE PROMPT WITH DATA
         prompt = f"""
         You are Seseedy, a helpful AI assistant for the 'SeSeed' farming website.
         
-        Website details:
+        {product_context}
+        
+        Website Rules:
         - We sell vegetable, fruit, and leafy green seeds.
-        - We do NOT sell heavy machinery (tractors), only small tools (hoes, sprayers).
+        - We do NOT sell heavy machinery (tractors), only small tools.
         - Users can filter by category or price.
         
         User Question: {user_question}
         
-        Keep your answer helpful, short, and friendly.
+        Instructions:
+        - If the user asks for a price, LOOK at the 'CURRENT INVENTORY' list above and answer with the exact price in RM.
+        - If the product is not in the list, say we don't carry it.
+        - Keep your answer helpful, short, and friendly.
         """
+        
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:

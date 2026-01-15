@@ -5,6 +5,7 @@ import altair as alt
 from ai_engine import SeedAI 
 import time
 import calendar 
+import datetime 
 
 # --- CUSTOM CSS ---
 def load_css():
@@ -53,7 +54,6 @@ def load_css():
             background-color: rgba(58, 90, 64, 0.1) !important;
         }
 
-        /* AI Container Styling */
         .ai-container {
             background-color: #F1F8E9; 
             border: 2px solid #3A5A40; 
@@ -65,7 +65,6 @@ def load_css():
         .ai-title { color: #3A5A40; font-weight: 900; font-size: 1.5rem; margin-bottom: 10px; }
         .ai-desc { color: #333333; font-weight: 600; margin-bottom: 20px; }
 
-        /* Summary Cards Styling */
         .summary-container { display: flex; gap: 20px; margin-bottom: 30px; }
         .summary-card {
             background-color: white; padding: 25px; border-radius: 12px;
@@ -101,7 +100,6 @@ def load_css():
             font-size: 1rem;
         }
         
-        /* Farm Logo Styling */
         .farm-logo {
             font-size: 80px;
             text-align: center;
@@ -112,7 +110,6 @@ def load_css():
     """, unsafe_allow_html=True)
 
 # --- DIALOG FOR RENAMING FARM ---
-# Uses st.dialog if available (Streamlit 1.34+), otherwise falls back to older method
 if hasattr(st, 'dialog'):
     decorator = st.dialog
 else:
@@ -136,10 +133,8 @@ def get_data():
     """, conn)
     conn.close()
     
-    # FETCH USERNAME FROM SESSION
     username = st.session_state.get('username', 'Supplier')
     
-    # INITIALIZE FARM NAME IF NOT SET
     if 'farm_name' not in st.session_state:
         st.session_state['farm_name'] = f"{username}'s Farm"
     
@@ -183,7 +178,6 @@ def delete_product_from_db(product_name):
 def show_dashboard():
     load_css()
     
-    # --- INITIALIZE NEW AI ENGINE ---
     try:
         ai = SeedAI()
     except Exception as e:
@@ -196,51 +190,68 @@ def show_dashboard():
         st.error(f"Database Error: {e}")
         st.stop()
 
-    # --- SIDEBAR (UPDATED) ---
+    # --- SIDEBAR ---
     with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
-        # UPDATED: Use the 🌱 emoji instead of the image link
         st.markdown("<div class='farm-logo'>🌱</div>", unsafe_allow_html=True)
         st.title("SeSeed")
         st.markdown("**MANAGER PORTAL**")
         st.markdown("---")
         st.write(f"User: **{username}**")
-        # UPDATED: Use dynamic farm name
         st.write(f"Farm: **{farm_name}**")
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # --- HEADER (UPDATED) ---
-    # c1 = Title, c2 = Rename Button, c3 = Logout
+    # --- HEADER ---
     c1, c2, c3 = st.columns([6, 1.5, 1])
-    
     with c1:
-        # UPDATED: Title uses dynamic farm name
         st.title(f"{farm_name} Dashboard")
-    
     with c2:
-        # UPDATED: Add Rename Button
         if st.button("✏️ Rename", help="Change Farm Name"):
             rename_farm_dialog()
-
     with c3:
         if st.button("🚪 Log Out"):
             st.session_state['logged_in'] = False
             st.session_state['role'] = None
             st.session_state['show_login'] = False
-            # Clear farm name on logout so next user gets their own default
             if 'farm_name' in st.session_state:
                 del st.session_state['farm_name']
             st.rerun()
         
     st.markdown("---")
 
-    # 1. METRICS
+    # 1. METRICS & AI SMART ALERTS
     total_stock = df_products['stock'].sum() if not df_products.empty else 0
     est_value = (df_products['price'] * df_products['stock']).sum() if not df_products.empty else 0
-    low_stock_count = len(df_products[df_products['stock'] < 30]) if not df_products.empty else 0
+    
+    # --- AI-POWERED LOW STOCK ALERT ---
+    low_stock_count = 0
+    low_stock_items = [] # NEW: List to hold names of low stock items
+    current_month_index = datetime.datetime.now().month 
+    
+    if not df_products.empty:
+        for index, row in df_products.iterrows():
+            try:
+                prediction = ai.predict_with_reasoning(row['name'], current_month_index)
+                if isinstance(prediction, dict):
+                    predicted_demand = prediction['Predicted_Sales']
+                    current_stock = row['stock']
+                    if current_stock < predicted_demand:
+                        low_stock_count += 1
+                        # Add to list with details
+                        deficit = int(predicted_demand - current_stock)
+                        low_stock_items.append(f"• {row['name']} (Short by {deficit})")
+            except:
+                pass 
     
     alert_border = '#D62828' if low_stock_count > 0 else '#3A5A40'
     alert_class = 'alert-text' if low_stock_count > 0 else ''
+
+    # Create the Tooltip String (HTML encoded newlines)
+    if low_stock_items:
+        tooltip_text = "&#10;".join(low_stock_items)
+        tooltip_html = f'<span title="{tooltip_text}" style="cursor: help; font-size: 0.8em; margin-left: 5px;">ℹ️</span>'
+    else:
+        tooltip_html = ""
 
     st.markdown(f"""
     <div class="summary-container">
@@ -256,13 +267,11 @@ def show_dashboard():
         </div>
         <div class="summary-card" style="border-bottom: 5px solid {alert_border};">
             <span class="summary-icon">⚠️</span>
-            <div class="summary-label">Alerts</div>
+            <div class="summary-label">AI Stock Alerts {tooltip_html}</div>
             <div class="summary-value {alert_class}">{low_stock_count}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    # --- (UPDATED: REMOVED ANY EMPTY CONTAINERS HERE TO FIX BLANK BOX ISSUE) ---
 
     # 2. AI FORECAST GRAPH
     st.markdown('<div class="ai-container">', unsafe_allow_html=True)
@@ -279,42 +288,55 @@ def show_dashboard():
         # --- FORECAST LOGIC ---
         forecast_data = []
         for m in range(1, 13):
-            # Calls your new reasoning engine
             prediction = ai.predict_with_reasoning(selected_name, m)
-            
-            # Map Month Number (1) -> Name (Jan)
             month_name = calendar.month_abbr[m]
             
             forecast_data.append({
                 "Month": month_name,
                 "Predicted Demand": prediction['Predicted_Sales'],
-                "AI Reasoning": prediction['Reasoning']
+                "AI Reasoning": prediction['Reasoning'],
+                "IsCurrentMonth": (m == current_month_index)
             })
 
         forecast_df = pd.DataFrame(forecast_data)
 
         if not forecast_df.empty:
-            # Sort order for the chart (Jan -> Dec)
-            month_order = list(calendar.month_abbr[1:])
             
+            # DEFINE THE SORT ORDER
+            month_order = list(calendar.month_abbr[1:]) 
+
             base = alt.Chart(forecast_df).encode(
                 x=alt.X('Month', sort=month_order, title="Month"),
                 y=alt.Y('Predicted Demand', title="Predicted Units Sold")
             )
+
+            # Layers
             line = base.mark_line(color='#3A5A40', strokeWidth=4)
             points = base.mark_circle(size=120, color='#3A5A40').encode(
                 tooltip=['Month', 'Predicted Demand', 'AI Reasoning']
             )
             
-            # Stock Line
+            # Stock Line (Red)
             stock_line = alt.Chart(pd.DataFrame({'y': [current_stock]})).mark_rule(color='#D62828', strokeDash=[5,5]).encode(y='y')
+
+            # --- CURRENT MONTH TRACKER (Blue) ---
+            current_month_line = base.mark_rule(
+                color='#2196F3', 
+                strokeWidth=3,
+                strokeDash=[2,2]
+            ).transform_filter(
+                alt.datum.IsCurrentMonth == True
+            )
             
-            final_chart = (line + points + stock_line).properties(height=400).interactive()
+            final_chart = (line + points + stock_line + current_month_line).properties(height=400).interactive()
             st.altair_chart(final_chart, use_container_width=True)
             
-            col_stat1, col_stat2 = st.columns(2)
-            col_stat1.caption(f"🔴 Red Dashed Line = Current Stock ({current_stock} units)")
-            col_stat2.caption("🟢 Green Line = Predicted Demand")
+            # Caption
+            curr_month_name = calendar.month_abbr[current_month_index]
+            c_cap1, c_cap2, c_cap3 = st.columns(3)
+            c_cap1.caption(f"🔴 Red Dashed = Stock ({current_stock})")
+            c_cap2.caption("🟢 Green Line = Predicted Demand")
+            c_cap3.caption(f"🔵 Blue Line = Current Month ({curr_month_name})")
         else:
             st.warning("Not enough data to generate forecast.")
     else:
@@ -390,11 +412,9 @@ def show_dashboard():
     if not df_products.empty:
         max_stock_val = int(df_products['stock'].max())
         
-        # COPY Dataframe so we don't mess up the original data
         df_display = df_products.copy()
         df_display['stock'] = df_display['stock'].astype(int)
 
-        # FILTER COLUMNS: Show only relevant columns (Hide images/desc)
         cols_to_keep = ["name", "category", "price", "stock", "days_to_grow", "peak_month"]
         df_display = df_display[cols_to_keep]
 
@@ -413,7 +433,6 @@ def show_dashboard():
                 ),
                 "days_to_grow": "Growth Days",
                 "peak_month": "Peak Month (0=All)",
-                # UPDATED: Price column simplified
                 "price": st.column_config.NumberColumn("Price (RM)", format="%.2f") 
             },
             hide_index=True
