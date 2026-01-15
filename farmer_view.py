@@ -195,12 +195,11 @@ def farmer_dashboard(products):
             background-color: #b71c1c !important;
         }
 
-        /* --- NEW STYLING FOR MIC RECORDER --- */
-        /* Center the mic button */
+        /* --- MIC RECORDER STYLING --- */
         div[data-testid="stColumn"] > div > div > div > button[title="Start recording"] {
             margin: 0 auto;
             display: block;
-            background-color: #d32f2f; /* Red for recording */
+            background-color: #d32f2f;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -209,7 +208,7 @@ def farmer_dashboard(products):
          div[data-testid="stColumn"] > div > div > div > button[title="Stop recording"] {
              margin: 0 auto;
             display: block;
-            background-color: #1a472a; /* Green for stop */
+            background-color: #1a472a;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -219,7 +218,7 @@ def farmer_dashboard(products):
     """, unsafe_allow_html=True)
 
     # =========================================================
-    # 3. CHATBOT VIEW SWITCH (UPDATED FOR VOICE)
+    # 3. CHATBOT VIEW SWITCH (UPDATED FLOW)
     # =========================================================
     
     if "messages" not in st.session_state:
@@ -243,18 +242,17 @@ def farmer_dashboard(products):
 
         st.markdown("---")
 
-        # 1. Display History
+        # 1. Display History (Scrollable Area)
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 if msg.get("audio"):
                     st.audio(msg["audio"], format="audio/mp3")
 
-        # 2. Voice Input Controls
+        # 2. Voice Input Button (Always at bottom of history)
         st.write("Tap microphone to speak:")
         cmic1, cmic2, cmic3 = st.columns([2,1,2])
         with cmic2:
-            # The Recorder Component
             audio_data = mic_recorder(
                 start_prompt="🎤 Start",
                 stop_prompt="🟥 Stop", 
@@ -263,53 +261,48 @@ def farmer_dashboard(products):
                 use_container_width=True
             )
 
-        # 3. VERIFICATION: Did it record?
-        # If recording exists, show a player so user can check
-        if audio_data and audio_data['bytes']:
-            st.audio(audio_data['bytes'], format="audio/wav") # <--- Playback what you just said
+        # 3. Text Input (Pinned to Bottom)
+        # We assign this to a variable so we can check it later
+        text_input_val = st.chat_input("Ask about seeds, planting, or equipment...")
 
-        # 4. Processing Logic
-        prompt = None
+        # 4. Processing Logic (Handle either Voice or Text)
+        final_prompt = None
         
-        # A. Handle Voice
+        # A. Check Voice First
         if audio_data and audio_data['bytes']:
             with st.spinner("Transcribing voice..."):
-                # Send to backend (which now converts WebM -> WAV correctly)
                 transcribed_text = backend.transcribe_audio(audio_data['bytes'])
-                
                 if transcribed_text:
-                    prompt = transcribed_text
+                    final_prompt = transcribed_text
                 else:
-                    st.warning("🎤 Audio captured, but no speech detected. Try speaking closer to the mic.")
+                    st.error("Sorry, I couldn't understand the audio. Please try again.")
+        
+        # B. Check Text Second (if no voice)
+        elif text_input_val:
+            final_prompt = text_input_val
 
-        # B. Handle Text (Fallback)
-        if prompt is None:
-            prompt = st.chat_input("Ask about seeds, planting, or equipment...")
-
-        # 5. Generate Response
-        if prompt:
-            # User Message
-            st.session_state.messages.append({"role": "user", "content": prompt, "audio": None})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
-            # Assistant Response
-            with st.chat_message("assistant"):
-                with st.spinner("Seseedy is thinking..."):
-                    # Text
-                    response_text = backend.ask_ai(prompt)
-                    st.markdown(response_text)
-                    
-                    # Audio
-                    with st.spinner("Generating voice response..."):
-                        tts_audio_bytes = backend.text_to_speech_bytes(response_text)
-                        if tts_audio_bytes:
-                            st.audio(tts_audio_bytes, format="audio/mp3")
+        # 5. Execute & Rerun (This keeps everything clean)
+        if final_prompt:
+            # Add User Message
+            st.session_state.messages.append({"role": "user", "content": final_prompt, "audio": None})
             
-            # Save History
-            st.session_state.messages.append({"role": "assistant", "content": response_text, "audio": tts_audio_bytes})
+            # Generate AI Response
+            with st.spinner("Seseedy is thinking..."):
+                response_text = backend.ask_ai(final_prompt)
+                # Generate Audio
+                tts_audio_bytes = backend.text_to_speech_bytes(response_text)
 
-        return
+            # Add AI Message
+            st.session_state.messages.append({"role": "assistant", "content": response_text, "audio": tts_audio_bytes})
+            
+            # FORCE REFRESH
+            # This causes the page to reload. 
+            # The new messages will be in the loop above.
+            # The mic button will render AFTER them (at the bottom).
+            # The chat input will render again (remaining visible).
+            st.rerun()
+
+        return 
 
     # =========================================================
     # 4. DASHBOARD LOGIC (Remains unchanged)

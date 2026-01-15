@@ -17,7 +17,7 @@ def configure_ai():
         
         # FIX: "Gemini 3" was too expensive (Quota limit 0). 
         # Switching to "Nano" which is usually the free/fast option in your list.
-        return genai.GenerativeModel('gemini-2.5-flash')
+        return genai.GenerativeModel('gemini-pro')
         
     except Exception as e:
         st.error(f"⚠️ AI Setup Error: {e}")
