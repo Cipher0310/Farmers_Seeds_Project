@@ -223,7 +223,6 @@ def farmer_dashboard(products):
     # =========================================================
     
     if "messages" not in st.session_state:
-        # Using a slightly different structure to hold audio bytes if they exist
         st.session_state["messages"] = [
             {"role": "assistant", "content": "Hello! I am Seseedy. Ask me about seeds, planting guides, or how to use this website!", "audio": None}
         ]
@@ -248,66 +247,69 @@ def farmer_dashboard(products):
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
-                # If this message has associated audio, play it
                 if msg.get("audio"):
                     st.audio(msg["audio"], format="audio/mp3")
 
         # 2. Voice Input Controls
-        # We place the mic recorder just above the chat input
         st.write("Tap microphone to speak:")
-        cmic1, cmic2, cmic3 = st.columns([2,1,2]) # Center the button
+        cmic1, cmic2, cmic3 = st.columns([2,1,2])
         with cmic2:
-            # This component handles browser-based recording
+            # The Recorder Component
             audio_data = mic_recorder(
                 start_prompt="🎤 Start",
                 stop_prompt="🟥 Stop", 
                 key='voice_recorder',
-                just_once=True, # Important: Resets after use so it doesn't keep sending old audio
+                just_once=True,
                 use_container_width=True
             )
 
-        # 3. Logic to handle inputs (either voice OR text)
+        # 3. VERIFICATION: Did it record?
+        # If recording exists, show a player so user can check
+        if audio_data and audio_data['bytes']:
+            st.audio(audio_data['bytes'], format="audio/wav") # <--- Playback what you just said
+
+        # 4. Processing Logic
         prompt = None
         
-        # Check Voice Input First
+        # A. Handle Voice
         if audio_data and audio_data['bytes']:
-            with st.spinner("Listening and transcribing..."):
-                # Send audio bytes to backend for transcription
+            with st.spinner("Transcribing voice..."):
+                # Send to backend (which now converts WebM -> WAV correctly)
                 transcribed_text = backend.transcribe_audio(audio_data['bytes'])
+                
                 if transcribed_text:
                     prompt = transcribed_text
                 else:
-                    st.error("Sorry, I couldn't understand the audio. Please try again.")
+                    st.warning("🎤 Audio captured, but no speech detected. Try speaking closer to the mic.")
 
-        # Check Text Input Second (if no voice input processed)
+        # B. Handle Text (Fallback)
         if prompt is None:
             prompt = st.chat_input("Ask about seeds, planting, or equipment...")
 
-        # 4. Process Prompt (if either voice or text provided)
+        # 5. Generate Response
         if prompt:
-            # A. Display user message
+            # User Message
             st.session_state.messages.append({"role": "user", "content": prompt, "audio": None})
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-            # B. Generate AI Response & TTS Audio
+            # Assistant Response
             with st.chat_message("assistant"):
                 with st.spinner("Seseedy is thinking..."):
-                    # 1. Get Text Response
+                    # Text
                     response_text = backend.ask_ai(prompt)
                     st.markdown(response_text)
                     
-                    # 2. Get Audio Response (TTS)
-                    # We use a separate spinner for audio generation as it might take a moment
-                    with st.spinner("Generating audio response..."):
+                    # Audio
+                    with st.spinner("Generating voice response..."):
                         tts_audio_bytes = backend.text_to_speech_bytes(response_text)
                         if tts_audio_bytes:
                             st.audio(tts_audio_bytes, format="audio/mp3")
             
-            # C. Save AI message to history
+            # Save History
             st.session_state.messages.append({"role": "assistant", "content": response_text, "audio": tts_audio_bytes})
 
-        return 
+        return
 
     # =========================================================
     # 4. DASHBOARD LOGIC (Remains unchanged)
