@@ -29,6 +29,23 @@ def confirm_delete_dialog():
         if st.button("No, Cancel", use_container_width=True, key="cancel_delete_btn"):
             st.rerun()
 
+# --- THANK YOU DIALOG FUNCTION (NEW) ---
+@decorator("🎉 Order Received!")
+def thank_you_dialog():
+    st.markdown("""
+        <div style="text-align: center; padding: 20px;">
+            <h2 style="color: #1a472a; margin-bottom: 10px;">Thank You!</h2>
+            <p style="font-size: 1.2rem; color: #333;">Your seed order has been placed successfully.</p>
+            <p style="font-size: 1rem; color: #666;">We hope you have a bountiful harvest! 🌱</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("Close & Continue", use_container_width=True, key="close_thank_you"):
+        # Clear cart and go back to main page or stay
+        st.session_state['cart'] = [] # Clear the cart after purchase
+        st.session_state['show_cart_modal'] = False # Close cart modal
+        st.rerun()
+
 # --- FARMER DASHBOARD ---
 def farmer_dashboard(products):
     
@@ -230,6 +247,48 @@ def farmer_dashboard(products):
             height: 50px;
              border: none;
          }
+                
+        /* ============================================= */
+        /* MOBILE OPTIMIZATIONS (Only affects phones)    */
+        /* ============================================= */
+        @media only screen and (max-width: 768px) {
+            
+            /* 1. Make Toast Notifications fit on small screens */
+            div[data-testid="stToast"] {
+                width: 90vw !important;       /* Take up 90% of phone width */
+                min-width: 0px !important;    /* Remove the 400px limit */
+                left: 5% !important;          /* Center it */
+                transform: translate(0, -50%) !important;
+                padding: 15px !important;
+            }
+            
+            /* 2. Adjust Font Sizes for Mobile */
+            h1 { font-size: 1.8rem !important; }
+            h2 { font-size: 1.5rem !important; }
+            h3 { font-size: 1.3rem !important; }
+            
+            /* 3. Make Buttons easier to tap */
+            div.stButton > button {
+                min-height: 50px !important; /* Taller buttons for fingers */
+                font-size: 1.1rem !important;
+            }
+
+            /* 4. Fix the Floating Customer Service Button position */
+            .floating-chat-container {
+                bottom: 20px !important;
+                right: 20px !important;
+            }
+            .floating-chat-container img {
+                width: 55px !important; /* Slightly smaller icon */
+            }
+
+            /* 5. Force columns to stack nicely (Fixes squashed headers) */
+            [data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 auto !important;
+                min-width: 1px !important;
+            }
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -440,10 +499,9 @@ def farmer_dashboard(products):
                 if st.button("Delete All Items", use_container_width=True):
                     confirm_delete_dialog()
             with b2:
+                # UPDATED: Trigger Thank You Dialog instead of changing page immediately
                 if st.button("Proceed to Checkout", use_container_width=True):
-                    st.session_state['page'] = 'checkout'
-                    st.session_state['show_cart_modal'] = False
-                    st.rerun()
+                    thank_you_dialog()
 
     # B. VIEW: PRODUCT DETAILS
     elif st.session_state['selected_product']:
