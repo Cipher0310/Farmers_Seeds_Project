@@ -129,6 +129,22 @@ def farmer_dashboard(products):
             border: none !important;
         }
 
+        /* 6. SEARCH BUTTON STYLING (FIXED) */
+        /* Targets: 3rd Main Column (Header Middle) -> 2nd Nested Column (Search Button) */
+        div[data-testid="column"]:nth-of-type(3) div[data-testid="column"]:nth-of-type(2) button {
+            background-color: #1b5e20 !important; 
+            border: none !important;
+            color: white !important;
+        }
+        div[data-testid="column"]:nth-of-type(3) div[data-testid="column"]:nth-of-type(2) button:hover {
+            background-color: #2e7d32 !important;
+            color: white !important;
+        }
+        /* Ensure the icon inside is white */
+        div[data-testid="column"]:nth-of-type(3) div[data-testid="column"]:nth-of-type(2) button p {
+            color: white !important;
+        }
+
         /* Cart Page Total */
         .cart-total {
             font-size: 1.5em;
@@ -296,16 +312,12 @@ def farmer_dashboard(products):
             st.session_state.messages.append({"role": "assistant", "content": response_text, "audio": tts_audio_bytes})
             
             # FORCE REFRESH
-            # This causes the page to reload. 
-            # The new messages will be in the loop above.
-            # The mic button will render AFTER them (at the bottom).
-            # The chat input will render again (remaining visible).
             st.rerun()
 
         return 
 
     # =========================================================
-    # 4. DASHBOARD LOGIC (Remains unchanged)
+    # 4. DASHBOARD LOGIC
     # =========================================================
 
     def update_view(category):
@@ -515,11 +527,12 @@ def farmer_dashboard(products):
     else:
         st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
         
-        # --- NAV LAYOUT ---
+        # --- FIXED NAV LAYOUT: ALL PRODUCTS + CUSTOMER SERVICE ---
         nav_home, nav_cs, nav_spacer = st.columns([1, 1.5, 4.5])
         
         with nav_home:
-            st.button("Home", use_container_width=True, on_click=update_view, args=('all',))
+            # RENAMED BUTTON: 'All Products' instead of 'Home'
+            st.button("All Products", use_container_width=True, on_click=update_view, args=('all',))
             
         with nav_cs:
              if st.button("🎧 Customer Service", use_container_width=True):
@@ -534,10 +547,11 @@ def farmer_dashboard(products):
             st.markdown("##### Categories")
             st.markdown("<br>", unsafe_allow_html=True)
             
-            st.button("🍆 Fruiting Veg", use_container_width=True, on_click=update_view, args=('Fruiting Veg',))
-            st.button("🍉 Fruit", use_container_width=True, on_click=update_view, args=('Fruit',))
-            st.button("🥬 Leafy Greens", use_container_width=True, on_click=update_view, args=('Leafy Greens',))
+            # --- SIMPLIFIED FILTERS: FRUIT & VEGETABLE ONLY ---
+            # 'Vegetable' button will trigger the 'Vegetable' view
             st.button("🥕 Vegetable", use_container_width=True, on_click=update_view, args=('Vegetable',))
+            # 'Fruit' button will trigger the 'Fruit' view
+            st.button("🍉 Fruit", use_container_width=True, on_click=update_view, args=('Fruit',))
 
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.markdown("##### Price")
@@ -560,10 +574,8 @@ def farmer_dashboard(products):
             title_map = {
                 'all': "All Products", 
                 'seeds': "Browse Seeds", 
-                'Leafy Greens': "Leafy Greens",
-                'Fruiting Veg': "Fruiting Vegetables",
                 'Fruit': "Fruits",
-                'Vegetable': "Vegetables"
+                'Vegetable': "Vegetables (All Types)"
             }
             page_title = title_map.get(st.session_state['view_category'], st.session_state['view_category'])
             st.markdown(f"##### {page_title}")
@@ -582,7 +594,14 @@ def farmer_dashboard(products):
                 ]
             else:
                 current_view = st.session_state['view_category']
-                if current_view != 'all' and current_view != 'seeds':
+                
+                # --- UPDATED FILTER LOGIC ---
+                if current_view == 'Vegetable':
+                    # If 'Vegetable' is selected, show: Vegetable, Leafy Green, AND Fruiting Veg
+                    filtered_products = [p for p in filtered_products if p['category'] in ['Vegetable', 'Leafy Green', 'Fruiting Veg', 'Herb']]
+                
+                elif current_view != 'all' and current_view != 'seeds':
+                    # Standard filter for 'Fruit'
                     filtered_products = [p for p in filtered_products if p['category'] == current_view]
                     
                 filtered_products = [
@@ -598,7 +617,7 @@ def farmer_dashboard(products):
                 cols = st.columns(3, gap="medium")
                 for i, p in enumerate(row):
                     with cols[i]:
-                        # THIS is the container that gets the border styling
+                        # Using border=True creates the stVerticalBlockBorderWrapper
                         with st.container(border=True):
                             st.markdown(f"""
                                 <div style="height: 200px; overflow: hidden; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; background-color: white;">
