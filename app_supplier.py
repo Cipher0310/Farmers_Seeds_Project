@@ -223,9 +223,8 @@ def show_dashboard():
     total_stock = df_products['stock'].sum() if not df_products.empty else 0
     est_value = (df_products['price'] * df_products['stock']).sum() if not df_products.empty else 0
     
-    # --- AI-POWERED LOW STOCK ALERT ---
     low_stock_count = 0
-    low_stock_items = [] # NEW: List to hold names of low stock items
+    low_stock_items = []
     current_month_index = datetime.datetime.now().month 
     
     if not df_products.empty:
@@ -237,7 +236,6 @@ def show_dashboard():
                     current_stock = row['stock']
                     if current_stock < predicted_demand:
                         low_stock_count += 1
-                        # Add to list with details
                         deficit = int(predicted_demand - current_stock)
                         low_stock_items.append(f"• {row['name']} (Short by {deficit})")
             except:
@@ -246,7 +244,6 @@ def show_dashboard():
     alert_border = '#D62828' if low_stock_count > 0 else '#3A5A40'
     alert_class = 'alert-text' if low_stock_count > 0 else ''
 
-    # Create the Tooltip String (HTML encoded newlines)
     if low_stock_items:
         tooltip_text = "&#10;".join(low_stock_items)
         tooltip_html = f'<span title="{tooltip_text}" style="cursor: help; font-size: 0.8em; margin-left: 5px;">ℹ️</span>'
@@ -302,28 +299,42 @@ def show_dashboard():
 
         if not forecast_df.empty:
             
-            # DEFINE THE SORT ORDER
             month_order = list(calendar.month_abbr[1:]) 
 
-            base = alt.Chart(forecast_df).encode(
-                x=alt.X('Month', sort=month_order, title="Month"),
-                y=alt.Y('Predicted Demand', title="Predicted Units Sold")
+            # --- KEY FIX 1: Strict Positive Y-Scale ---
+            y_scale = alt.Scale(domainMin=0)
+
+            # Base Chart (Encodes X only)
+            base_chart = alt.Chart(forecast_df).encode(
+                x=alt.X('Month', sort=month_order, title="Month")
             )
 
             # Layers
-            line = base.mark_line(color='#3A5A40', strokeWidth=4)
-            points = base.mark_circle(size=120, color='#3A5A40').encode(
+            # 1. Prediction Line (Uses Strict Y Scale)
+            line = base_chart.mark_line(color='#3A5A40', strokeWidth=4).encode(
+                y=alt.Y('Predicted Demand', title="Predicted Units Sold", scale=y_scale)
+            )
+            
+            # 2. Tooltip Points (Uses Strict Y Scale)
+            points = base_chart.mark_circle(size=120, color='#3A5A40').encode(
+                y=alt.Y('Predicted Demand', scale=y_scale),
                 tooltip=['Month', 'Predicted Demand', 'AI Reasoning']
             )
             
-            # Stock Line (Red)
-            stock_line = alt.Chart(pd.DataFrame({'y': [current_stock]})).mark_rule(color='#D62828', strokeDash=[5,5]).encode(y='y')
+            # 3. Stock Line (Red) - MUST ALSO USE THE STRICT Y SCALE
+            stock_line = alt.Chart(pd.DataFrame({'y': [current_stock]})).mark_rule(color='#D62828', strokeDash=[5,5]).encode(
+                y=alt.Y('y', scale=y_scale)
+            )
 
-            # --- CURRENT MONTH TRACKER (Blue) ---
-            current_month_line = base.mark_rule(
+            # 4. Current Month Line (Blue)
+            # --- KEY FIX 2: True Infinite Line ---
+            # Define from scratch so it does NOT inherit 'y' encoding from anywhere
+            current_month_line = alt.Chart(forecast_df).mark_rule(
                 color='#2196F3', 
                 strokeWidth=3,
                 strokeDash=[2,2]
+            ).encode(
+                x=alt.X('Month', sort=month_order)
             ).transform_filter(
                 alt.datum.IsCurrentMonth == True
             )
@@ -331,7 +342,6 @@ def show_dashboard():
             final_chart = (line + points + stock_line + current_month_line).properties(height=400).interactive()
             st.altair_chart(final_chart, use_container_width=True)
             
-            # Caption
             curr_month_name = calendar.month_abbr[current_month_index]
             c_cap1, c_cap2, c_cap3 = st.columns(3)
             c_cap1.caption(f"🔴 Red Dashed = Stock ({current_stock})")
